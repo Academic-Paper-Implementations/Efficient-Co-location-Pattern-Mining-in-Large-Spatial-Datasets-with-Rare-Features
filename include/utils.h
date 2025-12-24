@@ -46,6 +46,9 @@ SpatialInstance getInstanceByID(
     const std::vector<SpatialInstance>& instances, 
     const instanceID& id);
 
+std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet);
+
+double calculateDelta(const std::map<FeatureType, int>& featureCounts);
 /**
 * @brief Recursive helper to find all combinations of spatial instances
 *        matching a candidate pattern within a star neighborhood.
@@ -82,3 +85,4 @@ void printDuration(const std::string& stepName, std::chrono::high_resolution_clo
  * @return double Memory usage in MB
  */
 double getMemoryUsageMB();
+

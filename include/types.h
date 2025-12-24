@@ -27,9 +27,6 @@ using Colocation = std::vector<FeatureType>;
 /** @brief Type alias for a colocation instance (set of spatial instance pointers) */
 using ColocationInstance = std::vector<const struct SpatialInstance*>;
 
-/** @brief Type alias for colocation rules mapping */
-using ColocationRule = std::unordered_map<Colocation, Colocation>;
-
 // ============================================================================
 // Data Structures
 // ============================================================================
@@ -51,7 +48,7 @@ struct SpatialInstance {
  * A star neighborhood consists of a center instance and all its neighboring instances
  * within the distance threshold. This is a key concept in the joinless algorithm.
  */
-struct StarNeighborhood {
-    const SpatialInstance* center;                      ///< Center instance of the star
+struct OrderedNeigh {
+    const SpatialInstance* center;                      ///< 
     std::vector<const SpatialInstance*> neighbors;      ///< All neighbors within distance threshold
 };
