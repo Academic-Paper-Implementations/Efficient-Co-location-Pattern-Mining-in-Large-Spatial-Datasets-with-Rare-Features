@@ -46,9 +46,28 @@ SpatialInstance getInstanceByID(
     const std::vector<SpatialInstance>& instances, 
     const instanceID& id);
 
-std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet);
+/**
+ * @brief Sort features by instance count (ascending)
+ * @param featureSet The feature set to sort
+ * @param instances The instances used to count feature frequency
+ */
+std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
 
 double calculateDelta(const std::map<FeatureType, int>& featureCounts);
+/**
+ * @brief Calculate Rare Intensity (RI) for a feature in a pattern
+ * 
+ * @param rareType The feature type to calculate RI for
+ * @param pattern The co-location pattern
+ * @param featureCounts Map of instance counts for all features
+ * @param delta Global degree of dispersion
+ * @return double Rare Intensity value
+ */
+double calculateRareIntensity(
+    const FeatureType& rareType, 
+    const Colocation& pattern,
+    const std::map<FeatureType, int>& featureCounts,
+    double delta);
 /**
 * @brief Recursive helper to find all combinations of spatial instances
 *        matching a candidate pattern within a star neighborhood.
