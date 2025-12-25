@@ -16,10 +16,6 @@
  * a center instance and all its neighbors within the distance threshold.
  */
 class NeighborhoodMgr {
-private:
-    /// Map from feature type to all star neighborhoods of that type
-	NRTree OrderedNRTree;
-
 public:
     /**
      * @brief Build star neighborhoods from neighbor pairs

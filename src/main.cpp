@@ -8,6 +8,7 @@
 #include "spatial_index.h"
 #include "neighborhood_mgr.h"
 #include "miner.h"
+#include "types.h"
 #include "utils.h"
 #include <iostream>
 #include <fstream>
@@ -57,8 +58,9 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     std::cout << "[DEBUG] Step 4: Materializing neighborhoods...\n";
     auto t_mat_start = std::chrono::high_resolution_clock::now();
-    NeighborhoodMgr neighbor_mgr;
-    neighbor_mgr.buildFromPairs(neighborPairs);
+	NeighborhoodMgr neighbor_mgr;
+    std::vector<OrderedNeigh> orderedNeighSet = neighbor_mgr.buildFromPairs(neighborPairs);
+	NRTree orderedNRTree = neighbor_mgr.getOrderedNRTree(orderedNeighSet);
     auto t_mat_end = std::chrono::high_resolution_clock::now();
     std::cout << "[DEBUG] Step 4: Neighborhoods materialized.\n";
 
@@ -81,7 +83,7 @@ int main(int argc, char* argv[]) {
         }
     };
     
-    auto colocations = miner.mineColocations(config.minPrev, &neighbor_mgr, instances, progressCallback);
+    auto colocations = miner.mineColocations(config.minPrev, orderedNRTree, instances, progressCallback);
     std::cout << "[DEBUG] Step 5: Mining completed.\n";
     
     // ========================================================================

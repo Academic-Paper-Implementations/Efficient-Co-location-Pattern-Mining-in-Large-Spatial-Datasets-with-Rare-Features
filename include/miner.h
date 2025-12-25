@@ -31,58 +31,25 @@ using ProgressCallback = std::function<void(int, int, const std::string&, double
 class JoinlessMiner {
 private:
     double minPrev;                          ///< Minimum prevalence threshold
-    NeighborhoodMgr* neighborhoodMgr;        ///< Pointer to neighborhood manager
+    NRTree* orderedNRTree;        ///< Pointer to neighborhood manager
     ProgressCallback progressCallback;        ///< Progress reporting callback
 
-    /**
-     * @brief Filter star instances that match candidate patterns
-     * 
-     * Examines star neighborhoods to find instances that match the candidate
-     * colocation patterns. This is the first filtering step.
-     * 
-     * @param candidates Vector of candidate colocation patterns to check
-     * @param starNeigh Pair of feature type and its star neighborhoods
-     * @return std::vector<ColocationInstance> Filtered instances matching candidates
-     */
-    std::vector<ColocationInstance> filterStarInstances(
+    std::vector<ColocationInstance> genTableInstance(
         const std::vector<Colocation>& candidates,
-        const std::pair<FeatureType, std::vector<StarNeighborhood>>& starNeigh
+        const std::vector<ColocationInstance> prevTableInstances,
+		const NRTree& orderedNRTree
     );
 
-    /**
-     * @brief Filter clique instances from star instances
-     * 
-     * Performs clique filtering to ensure all (k-1) subsets of a k-size pattern
-     * exist in the previous level. Uses parallel processing for performance.
-     * 
-     * @param candidates Vector of candidate patterns
-     * @param instances Current level star instances
-     * @param prevInstances Previous level clique instances
-     * @return std::vector<ColocationInstance> Filtered clique instances
-     */
-    std::vector<ColocationInstance> filterCliqueInstances(
+    std::vector<ColocationInstance> calculateWPI(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance>& instances,
-        const std::vector<ColocationInstance>& prevInstances
+		const std::vector<ColocationInstance>& tableInstances
     );
 
-    /**
-     * @brief Select prevalent colocations based on participation ratio
-     * 
-     * Calculates the participation ratio for each candidate and selects
-     * those that meet the minimum prevalence threshold.
-     * 
-     * @param candidates Vector of candidate patterns
-     * @param instances Colocation instances to evaluate
-     * @param minPrev Minimum prevalence threshold
-     * @param featureCount Map of feature type to total instance count
-     * @return std::vector<Colocation> Prevalent colocation patterns
-     */
+   
     std::vector<Colocation> selectPrevColocations(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance>& instances,
-        double minPrev,
-        const std::map<FeatureType, int>& featureCount
+        const std::vector<ColocationInstance>& tableInstances,
+        double minPrev
     );
 
 public:
@@ -100,7 +67,7 @@ public:
      */
     std::vector<Colocation> mineColocations(
         double minPrevalence, 
-        NeighborhoodMgr* nbrMgr, 
+        NRTree& orderedNRTree, 
         const std::vector<SpatialInstance>& instances,
         ProgressCallback progressCb = nullptr
     );
@@ -117,4 +84,9 @@ public:
     std::vector<Colocation> generateCandidates(
         const std::vector<Colocation>& prevPrevalent
     );
+
+    std::vector<Colocation> filterCandidates(
+        const std::vector<Colocation>& candidates,
+		const std::vector<Colocation>& prevPrevalent
+	);
 };
