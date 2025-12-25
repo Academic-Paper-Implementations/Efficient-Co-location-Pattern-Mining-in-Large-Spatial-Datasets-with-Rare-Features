@@ -58,6 +58,14 @@ SpatialInstance getInstanceByID(
     return SpatialInstance{};
 }
 
+std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet) {
+
+};
+
+double calculateDelta(const std::map<FeatureType, int>& featureCounts) {
+
+};
+
 
 void findCombinations(
     const std::vector<FeatureType>& candidatePattern,

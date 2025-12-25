@@ -76,22 +76,6 @@ std::vector<std::pair<SpatialInstance, SpatialInstance>> SpatialIndex::findNeigh
             }
         }
     }
-    for (auto& p : neighborPairs) {
-        bool needSwap = false;
-
-        // So sánh Feature (String) trước
-        if (p.first.type > p.second.type) {
-            needSwap = true;
-        }
-        // Nếu Feature giống nhau thì so sánh ID
-        else if (p.first.type == p.second.type && p.first.id > p.second.id) {
-            needSwap = true;
-        }
-
-        if (needSwap) {
-            std::swap(p.first, p.second);
-        }
-    }
 
     return neighborPairs;
 }

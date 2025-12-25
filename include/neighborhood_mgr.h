@@ -7,6 +7,7 @@
 #include "types.h"
 #include <unordered_map>
 #include <vector>
+#include "NRTree.h"
 
 /**
  * @brief NeighborhoodMgr class for managing star neighborhoods of spatial instances
@@ -17,7 +18,7 @@
 class NeighborhoodMgr {
 private:
     /// Map from feature type to all star neighborhoods of that type
-    std::unordered_map<FeatureType, std::vector<StarNeighborhood>> starNeighborhoods;
+	NRTree OrderedNRTree;
 
 public:
     /**
@@ -28,7 +29,7 @@ public:
      * 
      * @param pairs Vector of neighbor pairs found by spatial indexing
      */
-    void buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs);
+    std::vector<OrderedNeigh> buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs);
 
     
     /**
@@ -37,5 +38,5 @@ public:
      * @return const std::unordered_map<FeatureType, std::vector<StarNeighborhood>>& 
      *         Map from feature type to vector of star neighborhoods
      */
-    const std::unordered_map<FeatureType, std::vector<StarNeighborhood>>& getAllStarNeighborhoods() const;
+    const NRTree& getOrderedNRTree(const std::vector<OrderedNeigh>& neighSet) const;
 };

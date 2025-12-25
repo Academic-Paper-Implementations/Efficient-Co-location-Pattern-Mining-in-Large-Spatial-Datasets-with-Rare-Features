@@ -85,4 +85,3 @@ void printDuration(const std::string& stepName, std::chrono::high_resolution_clo
  * @return double Memory usage in MB
  */
 double getMemoryUsageMB();
-
