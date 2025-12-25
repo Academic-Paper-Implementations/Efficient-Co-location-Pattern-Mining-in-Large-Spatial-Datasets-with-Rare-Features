@@ -7,6 +7,10 @@
 #include "utils.h"
 #include <algorithm>
 
+NRTree::NRTree() {
+    root = new NRNode(ROOT_NODE);
+}
+
 //Check is ordered function
 bool NeighborhoodMgr::isOrdered(const FeatureType& centerType,
     const FeatureType& neighborType,
@@ -36,12 +40,12 @@ void NeighborhoodMgr::buildFromPairs(const std::vector<std::pair<SpatialInstance
                 return set.center->id == center.id;
                 });
             if (it != vec.end()) {
-                it->neighbors.push_back(&neighbor);
+                it->neighbors[neighbor.type].push_back(&neighbor);
             }
             else {
                 OrderedNeigh newSet;
                 newSet.center = &center;
-                newSet.neighbors.push_back(&neighbor);
+                newSet.neighbors[neighbor.type].push_back(&neighbor);
                 vec.push_back(newSet);
             }
         }
@@ -52,12 +56,12 @@ void NeighborhoodMgr::buildFromPairs(const std::vector<std::pair<SpatialInstance
                 return set.center->id == neighbor.id;
                 });
             if (it != vec.end()) {
-                it->neighbors.push_back(&center);
+                it->neighbors[center.type].push_back(&center);
             }
             else {
                 OrderedNeigh newSet;
                 newSet.center = &neighbor;
-                newSet.neighbors.push_back(&center);
+                newSet.neighbors[center.type].push_back(&center);
                 vec.push_back(newSet);
             }
         }

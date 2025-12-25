@@ -49,6 +49,6 @@ struct SpatialInstance {
  * within the distance threshold. This is a key concept in the joinless algorithm.
  */
 struct OrderedNeigh {
-    const SpatialInstance* center;                      ///< 
-    std::vector<const SpatialInstance*> neighbors;      ///< All neighbors within distance threshold
+    const SpatialInstance* center;                      ///< Center instance
+    std::unordered_map<FeatureType, std::vector<const SpatialInstance*>> neighbors;      ///< All neighbors within distance threshold
 };
