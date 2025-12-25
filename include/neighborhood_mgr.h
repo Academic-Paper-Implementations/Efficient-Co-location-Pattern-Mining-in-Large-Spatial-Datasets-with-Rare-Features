@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file neighborhood_mgr.h
  * @brief Star neighborhood management for spatial instances
  */
@@ -25,8 +25,11 @@ public:
      * 
      * @param pairs Vector of neighbor pairs found by spatial indexing
      */
-    std::vector<OrderedNeigh> buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs);
-
+    void buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs,
+                        const std::unordered_map<FeatureType, int>&FeatureCounts);
+    
+    // kiểu trả về khớp với biến thành viên
+    const std::unordered_map<FeatureType, std::vector<OrderedNeigh>>& getOrderedNeighbors() const;
     
     /**
      * @brief Get all star neighborhoods organized by feature type
@@ -35,4 +38,15 @@ public:
      *         Map from feature type to vector of star neighborhoods
      */
     const NRTree& getOrderedNRTree(const std::vector<OrderedNeigh>& neighSet) const;
+
+private:
+    /**
+     * @brief Lưu trữ Neigh: Map từ FeatureType -> Danh sách các OrderedNeigh
+     */
+    std::unordered_map<FeatureType, std::vector<OrderedNeigh>> orderedNeighborMap;
+
+    // Hàm kiểm tra thứ tự
+    bool isOrdered(const FeatureType& centerType,
+        const FeatureType& neighborType,
+        const std::unordered_map<FeatureType, int>& counts);
 };
