@@ -1,50 +1,60 @@
-﻿#include <vector>
+﻿#pragma once
+#include <vector>
+#include <string>
+#include <iostream>
 #include <algorithm>
+#include "neighborhood_mgr.h" // Để dùng struct OrderedNeigh và FeatureType
+#include "types.h"
 
+// --- [QUAN TRỌNG] THÊM DÒNG NÀY ---
+class NeighborhoodMgr;
+// ---------------------------------
 
-// Create class N-ary tree
+// Loại node trong cây để dễ quản lý
+enum NodeType {
+    ROOT_NODE,
+    FEATURE_NODE,
+    INSTANCE_NODE,
+    NEIGHBOR_NODE
+};
+
+// Cấu trúc một nút trong cây NR-Tree
+struct NRNode {
+    NodeType type;
+
+    // Dữ liệu tùy thuộc vào loại node
+    FeatureType featureType;        // Dùng nếu là FEATURE_NODE
+    const SpatialInstance* data;    // Dùng nếu là INSTANCE_NODE hoặc NEIGHBOR_NODE
+
+    // Danh sách con
+    std::vector<NRNode*> children;
+
+    // Constructor helper
+    NRNode(NodeType t) : type(t), data(nullptr), featureType("") {}
+
+    ~NRNode() {
+        for (auto child : children) delete child;
+        children.clear();
+    }
+};
+
 class NRTree {
 private:
-    // CẤU TRÚC LÕI (Core Data Structure)
-    // Index của vector cha chính là ID của Instance cha (ví dụ: ID của D.1)
-    // Vector con chứa danh sách ID của các Instance hàng xóm (ví dụ: A.1, B.3, C.1)
-    std::vector<std::vector<int>> adj_list;
+    NRNode* root;
+
+    // Hàm đệ quy để in cây (cho mục đích debug)
+    void printRecursive(NRNode* node, int level) const;
 
 public:
-    // Khởi tạo kích thước cây dựa trên tổng số lượng instance tối đa của dữ liệu
-    NRTree(int max_instance_id) {
-        // +1 để có thể truy cập bằng index ID trực tiếp
-        adj_list.resize(max_instance_id + 1);
-    }
+    NRTree();
+    ~NRTree();
 
-    // Hàm thêm mối quan hệ cha -> con (Tương ứng các đường nối trong ảnh)
-    // parent_id: Ví dụ ID của D.1
-    // child_id: Ví dụ ID của A.1
-    void insert_relation(int parent_id, int child_id) {
-        if (parent_id >= adj_list.size()) {
-            // Resize nếu ID vượt quá dự tính (An toàn)
-            adj_list.resize(parent_id + 100);
-        }
-        adj_list[parent_id].push_back(child_id);
-    }
+    // Hàm quan trọng nhất: Xây dựng cây từ kết quả của NeighborhoodMgr
+    void build(const NeighborhoodMgr& neighMgr);
 
-    // Hàm lấy danh sách con (Dùng cho bước sinh bảng Instance Table)
-    // Tương đương với việc nhìn vào D.1 và thấy A.1, B.3, C.1
-    const std::vector<int>& get_children(int parent_id) const {
-        if (parent_id < adj_list.size()) {
-            return adj_list[parent_id];
-        }
-        static const std::vector<int> empty;
-        return empty;
-    }
+    // Hàm in cây ra màn hình để kiểm tra
+    void printTree() const;
 
-    // Hàm tiện ích: Sắp xếp lại các con (Đảm bảo tính "Ordered" của cây)
-    // Dùng sau khi add hết neighbors
-    void sort_children() {
-        for (auto& children : adj_list) {
-            // Trong thực tế, bạn cần sort theo Feature Type, sau đó đến Instance ID
-            // Ở đây sort theo ID để đơn giản hóa demo
-            std::sort(children.begin(), children.end());
-        }
-    }
+    // Getter root nếu cần xử lý bên ngoài
+    const NRNode* getRoot() const { return root; }
 };
