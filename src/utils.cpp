@@ -61,7 +61,11 @@ SpatialInstance getInstanceByID(
 }
 
 // Step 2: Sorting features in ascending order of the quantity of instances
-std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::map<FeatureType, int>& featureCounts) {
+// Step 2: Sorting features in ascending order of the quantity of instances
+std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances) {
+    // Generate feature counts using the helper function
+    std::map<FeatureType, int> featureCounts = countInstancesByFeature(instances);
+
     // Sort logic based on Algorithm 1 Step 2
     // Ascending order of instance counts
     std::sort(featureSet.begin(), featureSet.end(), 
@@ -123,7 +127,51 @@ double calculateDelta(const std::map<FeatureType, int>& featureCounts) {
     return factor * sumRatios;
 }
 
+// Calculate Rare Intensity (RI) for a feature in a co-location pattern
+// Definition 3, Formula (5): RI(fi, C) = exp( - (v(fi, C) - 1)^2 / (2 * delta^2) )
+// where v(fi, C) = num(fi) / num(f_min) (Definition 2)
+double calculateRareIntensity(
+    const FeatureType& rareType, 
+    const Colocation& pattern,
+    const std::map<FeatureType, int>& featureCounts,
+    double delta) 
+{
+    // Safety check for delta to avoid division by zero
+    if (delta <= 1e-9) return 0.0;
 
+    // 1. Find num(f_min) in the pattern
+    int minCount = -1;
+    for (const auto& feature : pattern) {
+        if (featureCounts.find(feature) != featureCounts.end()) {
+            int count = featureCounts.at(feature);
+            if (minCount == -1 || count < minCount) {
+                minCount = count;
+            }
+        } else {
+            // If a feature in the pattern has 0 instances, minCount is 0 logic
+            minCount = 0; 
+            break; 
+        }
+    }
+
+    if (minCount <= 0) return 0.0; // Avoid division by zero in v calculation
+
+    // 2. Get num(fi) for the rareType
+    int rareCount = 0;
+    if (featureCounts.find(rareType) != featureCounts.end()) {
+        rareCount = featureCounts.at(rareType);
+    }
+
+    // 3. Calculate v(fi, C) = num(fi) / num(f_min)
+    double v_val = static_cast<double>(rareCount) / static_cast<double>(minCount);
+
+    // 4. Calculate RI
+    // exponent term = - (v - 1)^2 / (2 * delta^2)
+    double numerator = std::pow(v_val - 1.0, 2);
+    double denominator = 2.0 * delta * delta;
+    
+    return std::exp(-numerator / denominator);
+}
 void findCombinations(
     const std::vector<FeatureType>& candidatePattern,
     int typeIndex,
