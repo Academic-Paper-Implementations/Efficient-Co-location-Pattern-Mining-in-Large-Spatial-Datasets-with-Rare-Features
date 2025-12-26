@@ -88,6 +88,7 @@ public:
 
     std::vector<Colocation> filterCandidates(
         const std::vector<Colocation>& candidates,
-		const std::vector<Colocation>& prevPrevalent
+		const std::vector<Colocation>& prevPrevalent,
+		double minPrev
 	);
 };

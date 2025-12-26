@@ -94,13 +94,13 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         // Step 9: filter_candidate_patterns(Ck, Pk-1)
         // Uses Lemma 2 and Lemma 3 to prune search space
         auto t2_start = std::chrono::high_resolution_clock::now();
-        std::vector<Colocation> fiteredCandidates = filterCandidates(candidates, prevColocations);
+        std::vector<Colocation> fiteredCandidates = filterCandidates(candidates, prevColocations, minPrev);
         auto t2_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 9: filter_candidate_patterns (k=" + std::to_string(k) + ")", t2_start, t2_end);
 
         // Step 10: Tk = gen_table_instances(Ck, Tk-1, ordered-NR-tree)
         auto t3_start = std::chrono::high_resolution_clock::now();
-        std::vector<ColocationInstance> tableInstances = genTableInstance(
+        tableInstances = genTableInstance(
             fiteredCandidates,
             prevTableInstances,
             orderedNRTree
@@ -235,9 +235,7 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
 std::vector<Colocation> JoinlessMiner::filterCandidates(
     const std::vector<Colocation>& candidates,
     const std::vector<Colocation>& prevPrevalent,
-    const std::map<Colocation, double>& prevPIs,
-    double minPrev,
-    double delta)
+    double minPrev)
 {
     // Implementation of filter_candidate_patterns (Step 9)
     std::vector<Colocation> filteredCandidates;
@@ -279,28 +277,16 @@ std::vector<Colocation> JoinlessMiner::filterCandidates(
                 double w = 1.0 / RI;
 
                 // 3. Get PI of the subset (needs to be looked up from previous results)
-                double pi_subset = 0.0;
-                auto it = prevPIs.find(subset);
-
-                if (it != prevPIs.end()) {
-                    pi_subset = it->second;
-                }
-                else {
-                    // If subset is not in prevPrevalent, it implies WPI(subset) < min_prev.
-                    // However, we don't know its exact PI.
-                    // Safe strategy: If unknown, assume we CANNOT prune (keep valid = true)
-                    // unless we strictly know PI is low enough.
-                    continue;
-                }
+                double piSubset = calculatePI(subset);
 
                 // Check Lemma 3 inequality
-                if (pi_subset * w < minPrev) {
+                if (piSubset * w < minPrev) {
                     isValid = false;
                     break; // Prune
                 }
             }
         }
-        if (allSubsetsPrevalent) {
+        if (isValid) {
             filteredCandidates.push_back(candidate);
         }
     }
