@@ -83,6 +83,21 @@ double calculateRareIntensity(
     const Colocation& pattern,
     const std::map<FeatureType, int>& featureCounts,
     double delta);
+
+/**
+ * @brief Calculate Participation Index (PI) of a co-location pattern
+ * 
+ * PI(C) = min(PR(fi, C)) for all fi in C
+ * 
+ * @param pattern The co-location pattern
+ * @param tableInstance The table instance T(C) of the pattern
+ * @param featureCounts Map of instance counts for all features
+ * @return double Participation Index value
+ */
+double calculatePI(
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts);
 /**
 * @brief Recursive helper to find all combinations of spatial instances
 *        matching a candidate pattern within a star neighborhood.

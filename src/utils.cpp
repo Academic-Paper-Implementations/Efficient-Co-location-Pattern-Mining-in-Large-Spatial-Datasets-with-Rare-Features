@@ -232,6 +232,35 @@ double calculateRareIntensity(
     
     return std::exp(-numerator / denominator);
 }
+
+// Calculate Participation Index (PI)
+// PI(C) = min_{i=1 to k} { PR(fi, C) }
+double calculatePI(
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts) 
+{
+    if (pattern.empty()) {
+        return 0.0;
+    }
+
+    double minPR = 1.0; // PR is a probability/ratio <= 1.0
+    bool first = true;
+
+    for (const auto& feature : pattern) {
+        double pr = calculatePR(feature, pattern, tableInstance, featureCounts);
+        if (first) {
+            minPR = pr;
+            first = false;
+        } else {
+            if (pr < minPR) {
+                minPR = pr;
+            }
+        }
+    }
+    
+    return minPR;
+}
 void findCombinations(
     const std::vector<FeatureType>& candidatePattern,
     int typeIndex,
