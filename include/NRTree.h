@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
-#include <unordered_map>
+#include <map>
 #include "neighborhood_mgr.h" // Để dùng struct OrderedNeigh và FeatureType
 #include "types.h"
 
@@ -49,12 +49,12 @@ private:
     void printRecursive(NRNode* node, int level) const;
 
 public:
-    NRTree();
+    inline NRTree();
     ~NRTree();
 
     // Hàm quan trọng nhất: Xây dựng cây từ kết quả của NeighborhoodMgr
     // Theo paper: features phải được sắp xếp theo số lượng instance (ascending)
-    void build(const NeighborhoodMgr& neighMgr, const std::unordered_map<FeatureType, int>& featureCounts);
+    void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts);
 
     // Hàm in cây ra màn hình để kiểm tra
     void printTree() const;

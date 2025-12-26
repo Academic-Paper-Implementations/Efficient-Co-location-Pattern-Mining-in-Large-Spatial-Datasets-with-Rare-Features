@@ -58,9 +58,12 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     std::cout << "[DEBUG] Step 4: Materializing neighborhoods...\n";
     auto t_mat_start = std::chrono::high_resolution_clock::now();
+	std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
 	NeighborhoodMgr neighbor_mgr;
-    std::vector<OrderedNeigh> orderedNeighSet = neighbor_mgr.buildFromPairs(neighborPairs);
-	NRTree orderedNRTree = neighbor_mgr.getOrderedNRTree(orderedNeighSet);
+    neighbor_mgr.buildFromPairs(neighborPairs, featureCount);
+    std::unordered_map<FeatureType, std::vector<OrderedNeigh>> orderedNeighbors = neighbor_mgr.getOrderedNeighbors();
+	NRTree orderedNRTree;
+	orderedNRTree.build(neighbor_mgr, featureCount);
     auto t_mat_end = std::chrono::high_resolution_clock::now();
     std::cout << "[DEBUG] Step 4: Neighborhoods materialized.\n";
 
@@ -83,7 +86,7 @@ int main(int argc, char* argv[]) {
         }
     };
     
-    auto colocations = miner.mineColocations(config.minPrev, orderedNRTree, instances, progressCallback);
+    auto colocations = miner.mineColocations(config.minPrev, orderedNRTree, instances, featureCount, progressCallback);
     std::cout << "[DEBUG] Step 5: Mining completed.\n";
     
     // ========================================================================
