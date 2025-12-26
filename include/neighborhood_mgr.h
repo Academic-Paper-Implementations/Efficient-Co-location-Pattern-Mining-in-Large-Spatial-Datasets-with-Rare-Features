@@ -28,16 +28,13 @@ public:
     void buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs,
                         const std::unordered_map<FeatureType, int>&FeatureCounts);
     
-    // kiểu trả về khớp với biến thành viên
-    const std::unordered_map<FeatureType, std::vector<OrderedNeigh>>& getOrderedNeighbors() const;
-    
     /**
-     * @brief Get all star neighborhoods organized by feature type
+     * @brief Get all ordered neighborhoods organized by feature type
      * 
-     * @return const std::unordered_map<FeatureType, std::vector<StarNeighborhood>>& 
-     *         Map from feature type to vector of star neighborhoods
+     * @return const std::unordered_map<FeatureType, std::vector<OrderedNeigh>>& 
+     *         Map from feature type to vector of ordered neighborhoods
      */
-    const NRTree& getOrderedNRTree(const std::vector<OrderedNeigh>& neighSet) const;
+    const std::unordered_map<FeatureType, std::vector<OrderedNeigh>>& getOrderedNeighbors() const;
 
 private:
     /**

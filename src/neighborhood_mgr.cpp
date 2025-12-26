@@ -7,10 +7,6 @@
 #include "utils.h"
 #include <algorithm>
 
-NRTree::NRTree() {
-    root = new NRNode(ROOT_NODE);
-}
-
 //Check is ordered function
 bool NeighborhoodMgr::isOrdered(const FeatureType& centerType,
     const FeatureType& neighborType,
