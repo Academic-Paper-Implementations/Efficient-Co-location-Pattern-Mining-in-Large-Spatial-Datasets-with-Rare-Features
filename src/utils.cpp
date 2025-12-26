@@ -61,7 +61,6 @@ SpatialInstance getInstanceByID(
 }
 
 // Step 2: Sorting features in ascending order of the quantity of instances
-// Step 2: Sorting features in ascending order of the quantity of instances
 std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances) {
     // Generate feature counts using the helper function
     std::map<FeatureType, int> featureCounts = countInstancesByFeature(instances);
@@ -125,6 +124,49 @@ double calculateDelta(const std::map<FeatureType, int>& featureCounts) {
     double factor = 2.0 / (m * (m - 1.0));
     
     return factor * sumRatios;
+}
+
+// Calculate Participation Ratio (PR)
+// PR(fi, C) = (number of distinct instances of fi in T(C)) / (number of instances of fi)
+double calculatePR(
+    const FeatureType& featureType,
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts) 
+{
+    // 1. Find the index of featureType in the pattern
+    int featureIndex = -1;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if (pattern[i] == featureType) {
+            featureIndex = static_cast<int>(i);
+            break;
+        }
+    }
+
+    if (featureIndex == -1) {
+        // Feature not in pattern
+        return 0.0;
+    }
+
+    // 2. Count distinct instances of featureType in T(C) to get numerator
+    std::set<instanceID> distinctInstances;
+    for (const auto& row : tableInstance) {
+        // Safety check: row size should match pattern size
+        if (featureIndex < static_cast<int>(row.size()) && row[featureIndex]) {
+            distinctInstances.insert(row[featureIndex]->id);
+        }
+    }
+
+    // 3. Get total count of featureType globally for denominator
+    int totalCount = 0;
+    if (featureCounts.find(featureType) != featureCounts.end()) {
+        totalCount = featureCounts.at(featureType);
+    }
+
+    if (totalCount == 0) return 0.0;
+
+    // 4. Calculate PR
+    return static_cast<double>(distinctInstances.size()) / static_cast<double>(totalCount);
 }
 
 // Calculate Rare Intensity (RI) for a feature in a co-location pattern
