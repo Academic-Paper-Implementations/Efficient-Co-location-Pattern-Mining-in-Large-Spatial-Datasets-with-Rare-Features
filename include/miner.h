@@ -34,10 +34,24 @@ private:
     NRTree* orderedNRTree;        ///< Pointer to neighborhood manager
     ProgressCallback progressCallback;        ///< Progress reporting callback
 
-    std::vector<ColocationInstance> genTableInstance(
+    std::map<Colocation, std::vector<ColocationInstance>> genTableInstance(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance> prevTableInstances,
+        const std::vector<ColocationInstance>& prevTableInstances,
 		const NRTree& orderedNRTree
+    );
+
+    // Helper function to find neighbors of an instance for a specific feature type from NRTree
+    std::vector<const SpatialInstance*> findNeighbors(
+        const NRTree& tree,
+        const SpatialInstance* instance,
+        const FeatureType& featureType
+    );
+
+    // Helper function to calculate S(I, f) = Neigh(o1, f) ∩ ··· ∩ Neigh(ok, f) (Definition 8)
+    std::vector<const SpatialInstance*> findExtendedSet(
+        const NRTree& tree,
+        const ColocationInstance& instance,
+        const FeatureType& featureType
     );
 
     std::vector<ColocationInstance> calculateWPI(
