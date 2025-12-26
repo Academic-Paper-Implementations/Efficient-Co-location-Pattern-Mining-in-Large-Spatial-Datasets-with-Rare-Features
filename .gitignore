@@ -32,3 +32,4 @@ spatial_index
 /mining_report.txt
 /src/test.cpp
 /out/build/x64-Release
+out/
