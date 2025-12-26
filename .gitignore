@@ -29,4 +29,4 @@ spatial_index
 /CMakeSettings.json
 /mining_report.txt
 /src/test.cpp
-/out
+out/
