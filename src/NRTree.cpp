@@ -89,9 +89,10 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::unordered_map<Fea
 
                 // Sắp xếp theo ID (alphabetical order)
                 std::sort(sortedNeighborInstances.begin(), sortedNeighborInstances.end(),
-                    [](const SpatialInstance* a, const SpatialInstance* b) {
-                        return a->id < b->id;
-                    });
+                [](const SpatialInstance* a, const SpatialInstance* b) {
+                    if (a->type != b->type) return a->type < b->type;
+                    return a->id < b->id;
+                });
 
                 // Tạo một INSTANCE_VECTOR_NODE duy nhất để lưu vector các neighbor instances
                 NRNode* instanceVectorNode = new NRNode(INSTANCE_VECTOR_NODE);
@@ -132,7 +133,7 @@ void NRTree::printRecursive(NRNode* node, int level) const {
             if (!first) std::cout << ", ";
             std::cout << inst->id << "[" << inst->type << "]";
             first = false;
-        }
+    }
         std::cout << "]\n";
         return; // INSTANCE_VECTOR_NODE là lá, không có con
     }

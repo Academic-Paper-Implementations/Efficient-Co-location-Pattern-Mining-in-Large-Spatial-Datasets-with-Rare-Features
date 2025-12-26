@@ -25,12 +25,13 @@ file(GLOB SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 # Build Target
 # ==============================================================================
 # Create executable
-add_executable (main ${SOURCE_FILES})
+add_executable (main ${SOURCE_FILES} "src/test.cpp" "src/NRTree.cpp")
 
 # ======================================================================
 # Runtime config copy (IMPORTANT)
 # ======================================================================
 file(COPY
     ${CMAKE_SOURCE_DIR}/config
+    ${CMAKE_SOURCE_DIR}/data
     DESTINATION ${CMAKE_BINARY_DIR}
 )

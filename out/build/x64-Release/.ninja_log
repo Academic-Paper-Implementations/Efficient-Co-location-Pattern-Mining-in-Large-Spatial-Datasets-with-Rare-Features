@@ -1,0 +1,14 @@
+# ninja log v6
+12	906	7883613496305655	CMakeFiles/main.dir/src/neighborhood_mgr.cpp.obj	74f06b806ebe3f82
+45	84	7883404424002995	CMakeFiles/main.dir/src/main.cpp.obj	5b7273b834d4d4a4
+43	711	7883403992761550	CMakeFiles/main.dir/src/config.cpp.obj	f5de91dc1f62c977
+46	85	7883404620451339	CMakeFiles/main.dir/src/miner.cpp.obj	f390771cb5302cdc
+17	851	7883613496391284	CMakeFiles/main.dir/src/spatial_index.cpp.obj	5497ab18db32102b
+23	1803	7883613496446569	CMakeFiles/main.dir/src/test.cpp.obj	86960d30a6cb127
+4	1883	7883613496285590	CMakeFiles/main.dir/src/data_loader.cpp.obj	3ae5983e7999cf4c
+28	1099	7883613496526178	CMakeFiles/main.dir/src/utils.cpp.obj	207ee5623fe305f3
+1883	1984	7883613515032977	main.exe	adb386eae13bc6bd
+3	15	7883392431970446	clean	5345ca6175c2c29c
+11	721	7883624544262366	CMakeFiles/main.dir/src/neighborhood_mgr.cpp.obj	74f06b806ebe3f82
+18	1465	7883624544423138	CMakeFiles/main.dir/src/test.cpp.obj	86960d30a6cb127
+51	713	7883625183331706	CMakeFiles/main.dir/src/neighborhood_mgr.cpp.obj	74f06b806ebe3f82
