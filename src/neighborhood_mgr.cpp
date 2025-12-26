@@ -10,7 +10,7 @@
 //Check is ordered function
 bool NeighborhoodMgr::isOrdered(const FeatureType& centerType,
     const FeatureType& neighborType,
-    const std::unordered_map<FeatureType, int>& counts){
+    const std::map<FeatureType, int>& counts){
 
     int numCenter = counts.at(centerType);
     int numNeighbor = counts.at(neighborType);
@@ -21,7 +21,7 @@ bool NeighborhoodMgr::isOrdered(const FeatureType& centerType,
 }
 
 void NeighborhoodMgr::buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs,
-    const std::unordered_map<FeatureType, int>& featureCounts) {
+    const std::map<FeatureType, int>& featureCounts) {
     // Build star neighborhoods from neighbor pairs
     // A star neighborhood has a center instance and all its neighbors
     orderedNeighborMap.clear();
