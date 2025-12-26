@@ -25,7 +25,7 @@ file(GLOB SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 # Build Target
 # ==============================================================================
 # Create executable
-add_executable (main ${SOURCE_FILES} "src/test.cpp" "src/NRTree.cpp")
+add_executable (main ${SOURCE_FILES})
 
 # ======================================================================
 # Runtime config copy (IMPORTANT)
