@@ -31,13 +31,6 @@ public:
     // kiểu trả về khớp với biến thành viên
     const std::unordered_map<FeatureType, std::vector<OrderedNeigh>>& getOrderedNeighbors() const;
     
-    /**
-     * @brief Get all star neighborhoods organized by feature type
-     * 
-     * @return const std::unordered_map<FeatureType, std::vector<StarNeighborhood>>& 
-     *         Map from feature type to vector of star neighborhoods
-     */
-    const NRTree& getOrderedNRTree(const std::vector<OrderedNeigh>& neighSet) const;
 
 private:
     /**

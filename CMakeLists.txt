@@ -32,5 +32,6 @@ add_executable (main ${SOURCE_FILES})
 # ======================================================================
 file(COPY
     ${CMAKE_SOURCE_DIR}/config
+    ${CMAKE_SOURCE_DIR}/data
     DESTINATION ${CMAKE_BINARY_DIR}
 )

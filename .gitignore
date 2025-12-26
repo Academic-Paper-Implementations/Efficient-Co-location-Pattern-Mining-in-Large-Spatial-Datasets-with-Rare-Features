@@ -25,9 +25,8 @@ main
 spatial_index
 /.vs/slnx.sqlite
 /.vs
-/out/build/x64-Debug
 /CppProperties.json
 /CMakeSettings.json
 /mining_report.txt
 /src/test.cpp
-/out/build/x64-Release
+out/

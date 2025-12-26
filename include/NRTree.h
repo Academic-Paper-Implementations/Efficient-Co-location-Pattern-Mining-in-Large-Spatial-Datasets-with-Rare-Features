@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
 #include "neighborhood_mgr.h" // Để dùng struct OrderedNeigh và FeatureType
 #include "types.h"
 
@@ -15,6 +16,7 @@ enum NodeType {
     ROOT_NODE,
     FEATURE_NODE,
     INSTANCE_NODE,
+    INSTANCE_VECTOR_NODE,  // Node để lưu vector các instances (dùng ở Level 4)
     NEIGHBOR_NODE
 };
 
@@ -25,6 +27,7 @@ struct NRNode {
     // Dữ liệu tùy thuộc vào loại node
     FeatureType featureType;        // Dùng nếu là FEATURE_NODE
     const SpatialInstance* data;    // Dùng nếu là INSTANCE_NODE hoặc NEIGHBOR_NODE
+    std::vector<const SpatialInstance*> instanceVector;  // Dùng nếu là INSTANCE_VECTOR_NODE
 
     // Danh sách con
     std::vector<NRNode*> children;
@@ -50,7 +53,8 @@ public:
     ~NRTree();
 
     // Hàm quan trọng nhất: Xây dựng cây từ kết quả của NeighborhoodMgr
-    void build(const NeighborhoodMgr& neighMgr);
+    // Theo paper: features phải được sắp xếp theo số lượng instance (ascending)
+    void build(const NeighborhoodMgr& neighMgr, const std::unordered_map<FeatureType, int>& featureCounts);
 
     // Hàm in cây ra màn hình để kiểm tra
     void printTree() const;
