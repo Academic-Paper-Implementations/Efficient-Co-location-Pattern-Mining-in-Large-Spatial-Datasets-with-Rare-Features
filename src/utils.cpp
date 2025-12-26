@@ -61,7 +61,6 @@ SpatialInstance getInstanceByID(
 }
 
 // Step 2: Sorting features in ascending order of the quantity of instances
-// Step 2: Sorting features in ascending order of the quantity of instances
 std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances) {
     // Generate feature counts using the helper function
     std::map<FeatureType, int> featureCounts = countInstancesByFeature(instances);
@@ -90,20 +89,28 @@ std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const
 // Formula: delta = (2 / (m*(m-1))) * Sum_{i<j} (num(f_j) / num(f_i))
 // This represents the average ratio of instance counts between all pairs of features,
 // where features are sorted by instance count (f_i <= f_j).
-double calculateDelta(const std::map<FeatureType, int>& featureCounts) {
-    if (featureCounts.size() < 2) {
+double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std::map<FeatureType, int>& featureCounts) {
+    if (sortedFeatures.size() < 2) {
         return 0.0;
     }
 
-    // 1. Extract counts into a vector for indexed access
+    // 1. Extract counts in the order of sortedFeatures (Step 2 order)
     std::vector<double> counts;
-    for (const auto& pair : featureCounts) {
-        counts.push_back(static_cast<double>(pair.second));
+    counts.reserve(sortedFeatures.size());
+    for (const auto& feat : sortedFeatures) {
+        if (featureCounts.find(feat) != featureCounts.end()) {
+            counts.push_back(static_cast<double>(featureCounts.at(feat)));
+        } else {
+            // Should not happen if sortedFeatures comes from keys of featureCounts,
+            // but safe to handle.
+            counts.push_back(0.0);
+        }
     }
 
-    // 2. Sort counts in ascending order (matching Step 2's logic implication)
-    // This ensures that for i < j, counts[i] <= counts[j], so the ratio >= 1.
-    std::sort(counts.begin(), counts.end());
+    // 2. NO sorting of 'counts' here. 
+    // We rely on 'sortedFeatures' being already sorted by quantity (Step 2).
+    // Paper: delta = 2/(m(m-1)) * Sum_{i<j} (|fj| / |fi|)
+    // The indices i, j correspond to the sorted feature list order.
 
     double m = static_cast<double>(counts.size());
     double sumRatios = 0.0;
@@ -111,11 +118,16 @@ double calculateDelta(const std::map<FeatureType, int>& featureCounts) {
     // 3. Calculate sum of ratios for all pairs i < j
     for (int i = 0; i < m; ++i) {
         for (int j = i + 1; j < m; ++j) {
-            // Avoid division by zero if count is 0 (though rare in mining)
+            // Formula uses |fj| / |fi| where i < j
+            // Since features are sorted by count ascending, |fi| <= |fj| usually holds,
+            // making the ratio >= 1 (or close to it/handling stability).
+            double numerator = counts[j];
             double denominator = counts[i];
+            
+            // Handle division by zero
             if (denominator == 0) denominator = 1e-6; 
             
-            double ratio = counts[j] / denominator;
+            double ratio = numerator / denominator;
             sumRatios += ratio;
         }
     }
@@ -125,6 +137,49 @@ double calculateDelta(const std::map<FeatureType, int>& featureCounts) {
     double factor = 2.0 / (m * (m - 1.0));
     
     return factor * sumRatios;
+}
+
+// Calculate Participation Ratio (PR)
+// PR(fi, C) = (number of distinct instances of fi in T(C)) / (number of instances of fi)
+double calculatePR(
+    const FeatureType& featureType,
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts) 
+{
+    // 1. Find the index of featureType in the pattern
+    int featureIndex = -1;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if (pattern[i] == featureType) {
+            featureIndex = static_cast<int>(i);
+            break;
+        }
+    }
+
+    if (featureIndex == -1) {
+        // Feature not in pattern
+        return 0.0;
+    }
+
+    // 2. Count distinct instances of featureType in T(C) to get numerator
+    std::set<instanceID> distinctInstances;
+    for (const auto& row : tableInstance) {
+        // Safety check: row size should match pattern size
+        if (featureIndex < static_cast<int>(row.size()) && row[featureIndex]) {
+            distinctInstances.insert(row[featureIndex]->id);
+        }
+    }
+
+    // 3. Get total count of featureType globally for denominator
+    int totalCount = 0;
+    if (featureCounts.find(featureType) != featureCounts.end()) {
+        totalCount = featureCounts.at(featureType);
+    }
+
+    if (totalCount == 0) return 0.0;
+
+    // 4. Calculate PR
+    return static_cast<double>(distinctInstances.size()) / static_cast<double>(totalCount);
 }
 
 // Calculate Rare Intensity (RI) for a feature in a co-location pattern
@@ -138,6 +193,11 @@ double calculateRareIntensity(
 {
     // Safety check for delta to avoid division by zero
     if (delta <= 1e-9) return 0.0;
+
+    // Definition check: RI(fi, C) is only defined if fi is in C
+    if (std::find(pattern.begin(), pattern.end(), rareType) == pattern.end()) {
+        return 0.0;
+    }
 
     // 1. Find num(f_min) in the pattern
     int minCount = -1;
@@ -171,6 +231,35 @@ double calculateRareIntensity(
     double denominator = 2.0 * delta * delta;
     
     return std::exp(-numerator / denominator);
+}
+
+// Calculate Participation Index (PI)
+// PI(C) = min_{i=1 to k} { PR(fi, C) }
+double calculatePI(
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts) 
+{
+    if (pattern.empty()) {
+        return 0.0;
+    }
+
+    double minPR = 1.0; // PR is a probability/ratio <= 1.0
+    bool first = true;
+
+    for (const auto& feature : pattern) {
+        double pr = calculatePR(feature, pattern, tableInstance, featureCounts);
+        if (first) {
+            minPR = pr;
+            first = false;
+        } else {
+            if (pr < minPR) {
+                minPR = pr;
+            }
+        }
+    }
+    
+    return minPR;
 }
 void findCombinations(
     const std::vector<FeatureType>& candidatePattern,

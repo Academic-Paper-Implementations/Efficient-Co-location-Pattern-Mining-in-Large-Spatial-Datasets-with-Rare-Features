@@ -19,7 +19,7 @@
 
 std::vector<Colocation> JoinlessMiner::mineColocations(
     double minPrev,
-    NRTree orderedNRTree,
+    NRTree& orderedNRTree,
     const std::vector<SpatialInstance>& instances,
     ProgressCallback progressCb
 ) {
@@ -71,7 +71,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
         // Step 8: Ck = gen_candidate_patterns(Pk-1, k)
         auto t1_start = std::chrono::high_resolution_clock::now();
-        std::vector<Colocation> candidates = generateCandidates(prevColocations);
+        std::vector<Colocation> candidates = generateCandidates(prevColocations, featureCount);
         auto t1_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 8: gen_candidate_patterns (k=" + std::to_string(k) + ")", t1_start, t1_end);
 
@@ -94,13 +94,13 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         // Step 9: filter_candidate_patterns(Ck, Pk-1)
         // Uses Lemma 2 and Lemma 3 to prune search space
         auto t2_start = std::chrono::high_resolution_clock::now();
-        std::vector<Colocation> fiteredCandidates = filterCandidates(candidates, prevColocations);
+        std::vector<Colocation> fiteredCandidates = filterCandidates(candidates, prevColocations, minPrev);
         auto t2_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 9: filter_candidate_patterns (k=" + std::to_string(k) + ")", t2_start, t2_end);
 
         // Step 10: Tk = gen_table_instances(Ck, Tk-1, ordered-NR-tree)
         auto t3_start = std::chrono::high_resolution_clock::now();
-        std::vector<ColocationInstance> tableInstances = genTableInstance(
+        tableInstances = genTableInstance(
             fiteredCandidates,
             prevTableInstances,
             orderedNRTree
@@ -175,7 +175,8 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
 
 std::vector<Colocation> JoinlessMiner::generateCandidates(
-    const std::vector<Colocation>& prevPrevalent)
+    const std::vector<Colocation>& prevPrevalent,
+    const std::map<FeatureType, int>& featureCount)
 {
     // Implementation of gen_candidate_patterns (Step 8)
     std::vector<Colocation> candidates;
@@ -201,35 +202,24 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
             if (prefix1 != prefix2) {
                 continue;
             }
-
+            
             // Generate new candidate
-            std::set<FeatureType> candidateSet(prevPrevalent[i].begin(),
-                prevPrevalent[i].end());
-            candidateSet.insert(prevPrevalent[j].back());
-
+			std::set<FeatureType> candidateSet;
+            if (featureCount.at(prevPrevalent[i].back()) <= featureCount.at(prevPrevalent[j].back())) {
+                candidateSet = std::set<FeatureType>(prevPrevalent[i].begin(),
+                    prevPrevalent[i].end());
+                candidateSet.insert(prevPrevalent[j].back());
+            }else {
+                candidateSet = std::set<FeatureType>(prevPrevalent[j].begin(),
+                    prevPrevalent[j].end());
+                candidateSet.insert(prevPrevalent[i].back());
+            }
+            
             if (candidateSet.size() != patternSize + 1) {
                 continue;
             }
 
             Colocation candidate(candidateSet.begin(), candidateSet.end());
-
-            // Prune phase: check subsets (Lemma 2)
-            bool allSubsetsValid = true;
-            std::vector<FeatureType> candFeatures = candidate;
-
-            for (size_t idx = 0; idx < candFeatures.size(); idx++) {
-                Colocation subset = candFeatures;
-                subset.erase(subset.begin() + idx);
-
-                if (prevSet.find(subset) == prevSet.end()) {
-                    allSubsetsValid = false;
-                    break;
-                }
-            }
-
-            if (allSubsetsValid) {
-                candidates.push_back(candidate);
-            }
         }
     }
 
@@ -242,214 +232,63 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
 }
 
 
-std::vector<ColocationInstance> JoinlessMiner::filterStarInstances(
+std::vector<Colocation> JoinlessMiner::filterCandidates(
     const std::vector<Colocation>& candidates,
-    const std::pair<FeatureType, std::vector<StarNeighborhood>>& starNeigh)
+    const std::vector<Colocation>& prevPrevalent,
+    double minPrev)
 {
-    // Part of row instance generation logic
-    std::vector<ColocationInstance> filteredInstances;
-    FeatureType centerType = starNeigh.first;
-
-    // Filter candidates to only those with this center type as first element
-    std::vector<const Colocation*> relevantCandidates;
-    for (const auto& cand : candidates) {
-        if (!cand.empty() && cand[0] == centerType) {
-            relevantCandidates.push_back(&cand);
-        }
+    // Implementation of filter_candidate_patterns (Step 9)
+    std::vector<Colocation> filteredCandidates;
+    if (candidates.empty() || prevPrevalent.empty()) {
+        return filteredCandidates;
     }
-
-    if (relevantCandidates.empty()) return filteredInstances;
-
-    // Iterate through each star neighborhood (concept from Ordered NR-Tree branch)
-    for (const auto& star : starNeigh.second) {
-
-        // Build a map of neighbors by feature type for fast lookup
-        // Using const pointer since star is const
-        std::unordered_map<FeatureType, std::vector<const SpatialInstance*>> neighborMap;
-
-        for (auto neighbor : star.neighbors) {
-            neighborMap[neighbor->type].push_back(neighbor);
-        }
-
-        // Check each relevant candidate pattern
-        for (const auto* candPtr : relevantCandidates) {
-            const auto& candidate = *candPtr;
-
-            std::vector<const SpatialInstance*> currentInstance;
-            currentInstance.reserve(candidate.size());
-
-            // Add center instance as first element
-            currentInstance.push_back(star.center);
-
-            // Recursive function to find combinations (row instances)
-            findCombinations(candidate, 1, currentInstance, neighborMap, filteredInstances);
-        }
-    }
-
-    return filteredInstances;
-}
-
-
-std::vector<ColocationInstance> JoinlessMiner::filterCliqueInstances(
-    const std::vector<Colocation>& candidates,
-    const std::vector<ColocationInstance>& instances,
-    const std::vector<ColocationInstance>& prevInstances
-) {
-    // Helper logic for Step 10 (gen_table_instances) validation
-    // ========================================================================
-    // PREPARE LOOKUP STRUCTURES
-    // ========================================================================
-
-    // 1. Create a set of valid candidate patterns for quick lookup
-    std::set<Colocation> validCandidatePatterns(candidates.begin(), candidates.end());
-
-    // 2. Create a set of previous instances for quick lookup (Check against Tk-1)
-    std::set<std::vector<std::string>> validPrevIds;
-    for (const auto& prevInst : prevInstances) {
-        std::vector<std::string> ids;
-        ids.reserve(prevInst.size());
-        for (const auto* ptr : prevInst) {
-            ids.push_back(ptr->id);
-        }
-        validPrevIds.insert(ids);
-    }
-
-    // ========================================================================
-    // PREPARE THREAD BUFFERS
-    // ========================================================================
-    int num_threads = omp_get_max_threads();
-    std::vector<std::vector<ColocationInstance>> thread_buffers(num_threads);
-
-    // ========================================================================
-    // PARALLEL FILTERING
-    // ========================================================================
-#pragma omp parallel for
-    for (size_t i = 0; i < instances.size(); ++i) {
-        const auto& instance = instances[i];
-        int thread_id = omp_get_thread_num();
-
-        // Safety check
-        if (instance.size() < 2) continue;
-
-        Colocation currentPattern;
-        currentPattern.reserve(instance.size());
-        for (const auto* ptr : instance) {
-            currentPattern.push_back(ptr->type);
-        }
-
-        // If current pattern is not a valid candidate, skip
-        if (validCandidatePatterns.find(currentPattern) == validCandidatePatterns.end()) {
-            continue;
-        }
-
-        std::vector<std::string> subInstanceIds;
-        subInstanceIds.reserve(instance.size() - 1);
-
-        // Generate (k-1)-subset by removing the first instance
-        for (size_t j = 1; j < instance.size(); ++j) {
-            subInstanceIds.push_back(instance[j]->id);
-        }
-
-        // Check if the (k-1)-subset exists in previous instances (Tk-1)
-        if (validPrevIds.find(subInstanceIds) != validPrevIds.end()) {
-            thread_buffers[thread_id].push_back(instance);
-        }
-    }
-
-    // ========================================================================
-    // COMBINE RESULTS
-    // ========================================================================
-    std::vector<ColocationInstance> filteredInstances;
-    for (const auto& buffer : thread_buffers) {
-        filteredInstances.insert(filteredInstances.end(), buffer.begin(), buffer.end());
-    }
-
-    return filteredInstances;
-}
-
-
-std::vector<Colocation> JoinlessMiner::selectPrevColocations(
-    const std::vector<Colocation>& candidates,
-    const std::vector<ColocationInstance>& instances,
-    double minPrev,
-    const std::map<FeatureType, int>& featureCount)
-{
-    // Implementation of Step 11: calculate_WPI and Step 12: select_prevalent_patterns
-    std::vector<Colocation> coarsePrevalent;
-
-    // ========================================================================
-    // Data structure for aggregation (calculating participation)
-    // ========================================================================
-    // Key: Candidate (Pattern)
-    // Value: Map<FeatureType, Set<InstanceID>> - count unique instances for each feature
-    std::map<Colocation, std::map<FeatureType, std::set<std::string>>> candidateStats;
-
-    // Initialize stats map for all candidates
-    for (const auto& cand : candidates) {
-        candidateStats[cand]; // Create empty entry
-    }
-
-    // ========================================================================
-    // Single pass through instances (Tk)
-    // ========================================================================
-    for (const ColocationInstance& instance : instances) {
-        // Extract pattern from instance
-        Colocation patternKey;
-        for (const auto& instPtr : instance) {
-            patternKey.push_back(instPtr->type);
-        }
-
-        // Check if this pattern is in the candidates of interest
-        auto it = candidateStats.find(patternKey);
-        if (it != candidateStats.end()) {
-            // Update participating instances statistics
-            for (const auto& instPtr : instance) {
-                it->second[instPtr->type].insert(instPtr->id);
-            }
-        }
-    }
-
-    // ========================================================================
-    // Calculate Metric and filter
-    // ========================================================================
-    for (const auto& item : candidateStats) {
-        const Colocation& candidate = item.first;
-        const auto& participatingMap = item.second; // Map<Feature, Set<ID>>
-
-        double min_participation_ratio = 1.0;
-        bool possible = true;
-
-        // Loop through features to calculate PR / WPI components
-        for (const auto& feature : candidate) {
-            // Get total global instance count for this feature
-            auto totalIt = featureCount.find(feature);
-            if (totalIt == featureCount.end() || totalIt->second == 0) {
-                possible = false;
-                break;
-            }
-            double totalFeatureCount = (double)(totalIt->second);
-
-            // Get count of instances participating in pattern
-            int participatedCount = 0;
-            auto partIt = participatingMap.find(feature);
-            if (partIt != participatingMap.end()) {
-                participatedCount = partIt->second.size();
+    std::set<Colocation> prevSet(prevPrevalent.begin(), prevPrevalent.end());
+    for (const auto& candidate : candidates) {
+        bool isValid = true;
+        // Generate all (k-1)-size subsets
+        for (size_t i = 0; i < candidate.size(); i++) {
+            Colocation subset;
+            for (size_t j = 0; j < candidate.size(); j++) {
+                if (j != i) subset.push_back(candidate[j]);
             }
 
-            // [ANOMALY FLAG]: Code calculates standard Participation Ratio (PR).
-            // Paper requires Weighted Participation Ratio (WPR) = PR * w(f, C).
-            double ratio = (double)participatedCount / totalFeatureCount;
-            if (ratio < min_participation_ratio) {
-                min_participation_ratio = ratio;
+            // --- CASE 1: Subset contains f_min (Lemma 2) ---
+            // If we removed an element at index i != 0, the subset still keeps candidate[0] (f_min).
+            if (i != 0) {
+                // Lemma 2: If a subset containing f_min is NOT prevalent, C is not prevalent 
+                if (prevSet.find(subset) == prevSet.end()) {
+                    isValid = false;
+                    break; // Prune immediately
+                }
+            }
+
+            // --- CASE 2: Subset does NOT contain f_min (Lemma 3) ---
+            // This happens when i == 0 (we removed f_min). Subset is {f2, ..., fk}.
+            else {
+                // Lemma 3: Check upper bound condition 
+                // Condition: PI(subset) * w(f_max, C) < min_prev => Prune
+
+                // 1. Find f_max (feature with max instances in C)
+                // Assuming sorted input, f_max is the last element
+                FeatureType f_max = candidate.back();
+
+                // 2. Calculate Weight w(f_max, C) = 1 / RI(f_max, C) 
+                double RI = calculateRI(f_max, candidate);
+                double w = 1.0 / RI;
+
+                // 3. Get PI of the subset (needs to be looked up from previous results)
+                double piSubset = calculatePI(subset);
+
+                // Check Lemma 3 inequality
+                if (piSubset * w < minPrev) {
+                    isValid = false;
+                    break; // Prune
+                }
             }
         }
-
-        // Check against min_prev
-        // Note: For WPI, this should clearly verify WPI(C) >= min_prev
-        if (possible && min_participation_ratio >= minPrev) {
-            coarsePrevalent.push_back(candidate);
+        if (isValid) {
+            filteredCandidates.push_back(candidate);
         }
     }
-
-    return coarsePrevalent;
+    return filteredCandidates;
 }

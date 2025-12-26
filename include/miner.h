@@ -82,11 +82,13 @@ public:
      * @return std::vector<Colocation> Generated (k+1)-size candidate patterns
      */
     std::vector<Colocation> generateCandidates(
-        const std::vector<Colocation>& prevPrevalent
+        const std::vector<Colocation>& prevPrevalent,
+        const std::map<FeatureType, int>& featureCount
     );
 
     std::vector<Colocation> filterCandidates(
         const std::vector<Colocation>& candidates,
-		const std::vector<Colocation>& prevPrevalent
+		const std::vector<Colocation>& prevPrevalent,
+		double minPrev
 	);
 };
