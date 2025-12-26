@@ -54,6 +54,21 @@ SpatialInstance getInstanceByID(
 std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
 
 double calculateDelta(const std::map<FeatureType, int>& featureCounts);
+
+/**
+ * @brief Calculate Participation Ratio (PR) for a feature in a co-location
+ * 
+ * @param featureType The feature type to calculate PR for
+ * @param pattern The co-location pattern
+ * @param tableInstance The table instance T(C) of the pattern
+ * @param featureCounts Map of total instance counts for all features
+ * @return double Participation Ratio value
+ */
+double calculatePR(
+    const FeatureType& featureType,
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts);
 /**
  * @brief Calculate Rare Intensity (RI) for a feature in a pattern
  * 
