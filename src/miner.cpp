@@ -8,9 +8,11 @@
 #include "miner.h"
 #include "utils.h"
 #include "neighborhood_mgr.h"
+#include "NRTree.h"
 #include "types.h"
 #include <algorithm>
 #include <set>
+#include <map>
 #include <string>
 #include <iostream>
 #include <omp.h> 
@@ -106,11 +108,16 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
         // Step 10: Tk = gen_table_instances(Ck, Tk-1, ordered-NR-tree)
         auto t3_start = std::chrono::high_resolution_clock::now();
-        tableInstances = genTableInstance(
+        std::map<Colocation, std::vector<ColocationInstance>> tableInstancesMap = genTableInstance(
             fiteredCandidates,
             prevTableInstances,
             orderedNRTree
         );
+        // Flatten map to vector for compatibility with selectPrevColocations
+        tableInstances.clear();
+        for (const auto& pair : tableInstancesMap) {
+            tableInstances.insert(tableInstances.end(), pair.second.begin(), pair.second.end());
+        }
         auto t3_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 10: gen_table_instances (k=" + std::to_string(k) + ")", t3_start, t3_end);
 
@@ -300,4 +307,210 @@ std::vector<Colocation> JoinlessMiner::filterCandidates(
         }
     }
     return filteredCandidates;
+}
+
+// Helper function to find neighbors of an instance for a specific feature type from NRTree
+// Returns Neigh(o, f) - all neighbors of instance o that have feature type f
+std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
+    const NRTree& tree,
+    const SpatialInstance* instance,
+    const FeatureType& featureType
+) {
+    std::vector<const SpatialInstance*> result;
+    const NRNode* root = tree.getRoot();
+    if (!root) return result;
+
+    // Traverse NRTree structure:
+    // Level 1: FEATURE_NODE (center features)
+    // Level 2: INSTANCE_NODE (center instances)
+    // Level 3: FEATURE_NODE (neighbor features)
+    // Level 4: INSTANCE_VECTOR_NODE (neighbor instances)
+
+    // Find the feature node for the instance's feature type (Level 1)
+    for (const auto* featureNode : root->children) {
+        if (featureNode->type == FEATURE_NODE && featureNode->featureType == instance->type) {
+            // Find the instance node for this specific instance (Level 2)
+            for (const auto* instanceNode : featureNode->children) {
+                if (instanceNode->type == INSTANCE_NODE && instanceNode->data == instance) {
+                    // Find the neighbor feature node for the target feature type (Level 3)
+                    for (const auto* neighborFeatureNode : instanceNode->children) {
+                        if (neighborFeatureNode->type == FEATURE_NODE && 
+                            neighborFeatureNode->featureType == featureType) {
+                            // Get the instance vector node (Level 4)
+                            if (!neighborFeatureNode->children.empty()) {
+                                const auto* instanceVectorNode = neighborFeatureNode->children[0];
+                                if (instanceVectorNode->type == INSTANCE_VECTOR_NODE) {
+                                    // Return all neighbor instances
+                                    return instanceVectorNode->instanceVector;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+// Helper function to calculate S(I, f) = Neigh(o1, f) ∩ ··· ∩ Neigh(ok, f) (Definition 8)
+// Returns the intersection of neighbors for all instances in I with feature type f
+std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
+    const NRTree& tree,
+    const ColocationInstance& instance,
+    const FeatureType& featureType
+) {
+    if (instance.empty()) {
+        return std::vector<const SpatialInstance*>();
+    }
+
+    // Start with neighbors of the first instance
+    std::vector<const SpatialInstance*> intersection = findNeighbors(tree, instance[0], featureType);
+    
+    // Intersect with neighbors of remaining instances
+    for (size_t i = 1; i < instance.size(); i++) {
+        std::vector<const SpatialInstance*> neighbors = findNeighbors(tree, instance[i], featureType);
+        
+        // Calculate intersection: keep only instances that are in both sets
+        std::vector<const SpatialInstance*> newIntersection;
+        std::set<const SpatialInstance*> neighborSet(neighbors.begin(), neighbors.end());
+        
+        for (const auto* inst : intersection) {
+            if (neighborSet.find(inst) != neighborSet.end()) {
+                newIntersection.push_back(inst);
+            }
+        }
+        
+        intersection = std::move(newIntersection);
+        
+        // Early termination if intersection becomes empty
+        if (intersection.empty()) {
+            break;
+        }
+    }
+
+    return intersection;
+}
+
+// Main function to generate table instances for candidate patterns (Step 10)
+// Uses Definition 8 and Lemma 4 to extend (k-1)-size instances to k-size instances
+std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableInstance(
+    const std::vector<Colocation>& candidates,
+    const std::vector<ColocationInstance>& prevTableInstances,
+    const NRTree& orderedNRTree
+) {
+    std::map<Colocation, std::vector<ColocationInstance>> result;
+
+    // For each candidate pattern C of size k
+    for (const auto& candidate : candidates) {
+        std::vector<ColocationInstance> tableInstances;
+
+        // For each table instance I of size k-1
+        for (const auto& prevInstance : prevTableInstances) {
+            // Check if prevInstance can be extended to form an instance of candidate
+            // According to the algorithm, candidates are generated from (k-1)-size patterns
+            // using Apriori-gen, so prevInstance should match a (k-1)-size subset of candidate
+            
+            // Check if prevInstance size matches (k-1)
+            if (prevInstance.size() != candidate.size() - 1) {
+                continue;
+            }
+
+            // Build set of features in prevInstance
+            std::set<FeatureType> prevInstanceFeatures;
+            for (const auto* inst : prevInstance) {
+                prevInstanceFeatures.insert(inst->type);
+            }
+
+            // Build set of features in candidate
+            std::set<FeatureType> candidateFeatures(candidate.begin(), candidate.end());
+
+            // Check if prevInstance is a subset of candidate (exactly k-1 features match)
+            if (prevInstanceFeatures.size() != candidateFeatures.size() - 1) {
+                continue;
+            }
+
+            // Find the new feature f (the one in candidate but not in prevInstance)
+            FeatureType newFeature = "";
+            bool isSubset = true;
+            
+            for (const auto& feature : candidateFeatures) {
+                if (prevInstanceFeatures.find(feature) == prevInstanceFeatures.end()) {
+                    if (newFeature.empty()) {
+                        newFeature = feature;
+                    } else {
+                        // More than one feature missing - prevInstance doesn't match
+                        isSubset = false;
+                        break;
+                    }
+                }
+            }
+
+            // Verify that all features in prevInstance are in candidate
+            for (const auto& feature : prevInstanceFeatures) {
+                if (candidateFeatures.find(feature) == candidateFeatures.end()) {
+                    isSubset = false;
+                    break;
+                }
+            }
+
+            if (!isSubset || newFeature.empty()) {
+                continue;
+            }
+
+            // Now we need to reorder prevInstance to match the order in candidate
+            // Create a mapping from feature to instance in prevInstance
+            std::map<FeatureType, const SpatialInstance*> featureToInstance;
+            for (const auto* inst : prevInstance) {
+                featureToInstance[inst->type] = inst;
+            }
+
+            // Build ordered instance matching candidate order (excluding newFeature)
+            ColocationInstance orderedPrevInstance;
+            for (const auto& feature : candidate) {
+                if (feature != newFeature) {
+                    auto it = featureToInstance.find(feature);
+                    if (it != featureToInstance.end()) {
+                        orderedPrevInstance.push_back(it->second);
+                    } else {
+                        // This shouldn't happen if isSubset is true, but check anyway
+                        isSubset = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!isSubset || orderedPrevInstance.size() != candidate.size() - 1) {
+                continue;
+            }
+
+            // Calculate S(I, f) = Neigh(o1, f) ∩ ··· ∩ Neigh(ok, f) (Definition 8)
+            std::vector<const SpatialInstance*> extendedSet = findExtendedSet(
+                orderedNRTree, orderedPrevInstance, newFeature
+            );
+
+            // According to Lemma 4: if S(I, f) ≠ Ø, append any instance o from S(I, f) to I
+            // to form a row instance I' = {o1, ..., ok, o} of co-location C' = {f1, ..., fk, f}
+            for (const auto* newInstance : extendedSet) {
+                // Verify that the new instance has the correct feature type
+                if (newInstance->type != newFeature) {
+                    continue;
+                }
+
+                // Create new row instance I' = orderedPrevInstance ∪ {o}
+                // The order should match candidate: [f1-instance, ..., fk-instance]
+                ColocationInstance newRowInstance = orderedPrevInstance;
+                newRowInstance.push_back(newInstance);
+                tableInstances.push_back(newRowInstance);
+            }
+        }
+
+        // Store table instances for this candidate pattern
+        if (!tableInstances.empty()) {
+            result[candidate] = tableInstances;
+        }
+    }
+
+    return result;
 }
