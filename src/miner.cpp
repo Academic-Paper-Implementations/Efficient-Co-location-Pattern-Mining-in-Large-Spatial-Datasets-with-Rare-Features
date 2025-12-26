@@ -134,7 +134,9 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         prevColocations = selectPrevColocations(
             fiteredCandidates,
             tableInstances,
-            minPrev
+            minPrev,
+			featureCount,
+			delta
         );
         auto t4_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 11-12: select_prevalent_patterns (k=" + std::to_string(k) + ")", t4_start, t4_end);

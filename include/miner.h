@@ -63,7 +63,9 @@ private:
     std::vector<Colocation> selectPrevColocations(
         const std::vector<Colocation>& candidates,
         const std::vector<ColocationInstance>& tableInstances,
-        double minPrev
+        double minPrev,
+        const std::map<FeatureType, int>& featureCount, // Cần thêm để tính PR/RI
+        double delta
     );
 
 public:
