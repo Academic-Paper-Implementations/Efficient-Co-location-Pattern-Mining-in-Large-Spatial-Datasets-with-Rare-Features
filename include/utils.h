@@ -53,7 +53,7 @@ SpatialInstance getInstanceByID(
  */
 std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
 
-double calculateDelta(const std::map<FeatureType, int>& featureCounts);
+double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std::map<FeatureType, int>& featureCounts);
 
 /**
  * @brief Calculate Participation Ratio (PR) for a feature in a co-location
