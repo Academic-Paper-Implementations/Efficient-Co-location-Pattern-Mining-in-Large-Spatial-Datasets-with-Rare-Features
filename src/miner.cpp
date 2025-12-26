@@ -21,6 +21,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     double minPrev,
     NRTree& orderedNRTree,
     const std::vector<SpatialInstance>& instances,
+    const std::map<FeatureType, int>& featureCount,
     ProgressCallback progressCb
 ) {
     // Start timer
@@ -34,7 +35,9 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     // Note: Passed in via arguments or pre-calculated in caller
     int k = 2;  // Start with size-2 patterns
     std::vector<FeatureType> types = getAllObjectTypes(instances);
-    std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
+	std::vector<FeatureType> sortedTypes = featureSort(types, instances);
+	double delta = calculateDelta(sortedTypes, featureCount);
+
 
     // P1 = F (Set of size-1 prevalent co-locations)
     std::vector<Colocation> prevColocations;
@@ -94,7 +97,10 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         // Step 9: filter_candidate_patterns(Ck, Pk-1)
         // Uses Lemma 2 and Lemma 3 to prune search space
         auto t2_start = std::chrono::high_resolution_clock::now();
-        std::vector<Colocation> fiteredCandidates = filterCandidates(candidates, prevColocations, minPrev);
+		std::vector<Colocation> fiteredCandidates = candidates;
+        if (k==2){
+            fiteredCandidates = filterCandidates(candidates, prevColocations, prevTableInstances, minPrev, featureCount, delta);
+        }
         auto t2_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 9: filter_candidate_patterns (k=" + std::to_string(k) + ")", t2_start, t2_end);
 
@@ -235,7 +241,10 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
 std::vector<Colocation> JoinlessMiner::filterCandidates(
     const std::vector<Colocation>& candidates,
     const std::vector<Colocation>& prevPrevalent,
-    double minPrev)
+	const std::vector<ColocationInstance>& tableInstance,
+    double minPrev,
+    std::map<FeatureType, int> featureCount,
+    double delta)
 {
     // Implementation of filter_candidate_patterns (Step 9)
     std::vector<Colocation> filteredCandidates;
@@ -273,11 +282,11 @@ std::vector<Colocation> JoinlessMiner::filterCandidates(
                 FeatureType f_max = candidate.back();
 
                 // 2. Calculate Weight w(f_max, C) = 1 / RI(f_max, C) 
-                double RI = calculateRI(f_max, candidate);
+                double RI = calculateRareIntensity(f_max, candidate, featureCount, delta);
                 double w = 1.0 / RI;
 
                 // 3. Get PI of the subset (needs to be looked up from previous results)
-                double piSubset = calculatePI(subset);
+                double piSubset = calculatePI(subset, tableInstance, featureCount);
 
                 // Check Lemma 3 inequality
                 if (piSubset * w < minPrev) {

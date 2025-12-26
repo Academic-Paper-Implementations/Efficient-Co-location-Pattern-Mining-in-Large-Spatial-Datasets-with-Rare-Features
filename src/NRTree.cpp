@@ -11,7 +11,7 @@ NRTree::~NRTree() {
     }
 }
 
-void NRTree::build(const NeighborhoodMgr& neighMgr, const std::unordered_map<FeatureType, int>& featureCounts) {
+void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts) {
     // 0. Reset cây nếu đã có dữ liệu cũ
     if (root) delete root;
     root = new NRNode(ROOT_NODE);

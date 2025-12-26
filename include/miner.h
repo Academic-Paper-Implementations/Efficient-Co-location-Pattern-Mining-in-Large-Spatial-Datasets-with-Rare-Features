@@ -69,6 +69,7 @@ public:
         double minPrevalence, 
         NRTree& orderedNRTree, 
         const std::vector<SpatialInstance>& instances,
+		const std::map<FeatureType, int>& featureCount,
         ProgressCallback progressCb = nullptr
     );
     
@@ -89,6 +90,9 @@ public:
     std::vector<Colocation> filterCandidates(
         const std::vector<Colocation>& candidates,
 		const std::vector<Colocation>& prevPrevalent,
-		double minPrev
-	);
+		const std::vector<ColocationInstance>& tableInstance,
+		double minPrev,
+		std::map<FeatureType, int> featureCount,
+		double delta
+    );
 };
