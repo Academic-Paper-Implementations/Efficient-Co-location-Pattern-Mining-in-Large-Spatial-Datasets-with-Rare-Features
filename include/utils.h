@@ -53,7 +53,22 @@ SpatialInstance getInstanceByID(
  */
 std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
 
-double calculateDelta(const std::map<FeatureType, int>& featureCounts);
+double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std::map<FeatureType, int>& featureCounts);
+
+/**
+ * @brief Calculate Participation Ratio (PR) for a feature in a co-location
+ * 
+ * @param featureType The feature type to calculate PR for
+ * @param pattern The co-location pattern
+ * @param tableInstance The table instance T(C) of the pattern
+ * @param featureCounts Map of total instance counts for all features
+ * @return double Participation Ratio value
+ */
+double calculatePR(
+    const FeatureType& featureType,
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts);
 /**
  * @brief Calculate Rare Intensity (RI) for a feature in a pattern
  * 
@@ -68,6 +83,21 @@ double calculateRareIntensity(
     const Colocation& pattern,
     const std::map<FeatureType, int>& featureCounts,
     double delta);
+
+/**
+ * @brief Calculate Participation Index (PI) of a co-location pattern
+ * 
+ * PI(C) = min(PR(fi, C)) for all fi in C
+ * 
+ * @param pattern The co-location pattern
+ * @param tableInstance The table instance T(C) of the pattern
+ * @param featureCounts Map of instance counts for all features
+ * @return double Participation Index value
+ */
+double calculatePI(
+    const Colocation& pattern,
+    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<FeatureType, int>& featureCounts);
 /**
 * @brief Recursive helper to find all combinations of spatial instances
 *        matching a candidate pattern within a star neighborhood.
