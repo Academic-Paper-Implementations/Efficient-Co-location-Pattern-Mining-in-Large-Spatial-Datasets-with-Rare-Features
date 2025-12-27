@@ -68,6 +68,9 @@ private:
         double delta
     );
 
+
+
+
 public:
     /**
      * @brief Mine prevalent colocation patterns using the joinless algorithm
@@ -110,5 +113,17 @@ public:
 		double minPrev,
 		std::map<FeatureType, int> featureCount,
 		double delta
+    );
+
+
+    std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
+        const NRTree& tree,
+        const SpatialInstance* instance,
+        const FeatureType& featureType
+    );
+    std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
+        const NRTree& tree,
+        const ColocationInstance& instance,
+        const FeatureType& featureType
     );
 };
