@@ -46,6 +46,12 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     std::vector<Colocation> prevColocations;
     // T1 = O (Table instance of size-1)
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
+    for (const auto& instance : instances) {
+        Colocation key = { instance.type };
+        ColocationInstance row = { &instance };
+        prevTableInstances[key].push_back(row);
+    }
+
     std::vector<Colocation> allPrevalentColocations;
 
     // Estimate total iterations (max pattern size is number of types)
@@ -58,7 +64,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     }
 
     // Step 6: let P1 = F, T1 = O, k = 2
-    for (auto t : types) prevColocations.push_back({ t });
+    for (auto t : sortedTypes) prevColocations.push_back({ t });
 
     // Step 7: while Pk-1 not empty do
     while (!prevColocations.empty()) {
@@ -198,8 +204,6 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
 
     size_t patternSize = prevPrevalent[0].size();
 
-    std::set<Colocation> prevSet(prevPrevalent.begin(), prevPrevalent.end());
-
     // Join phase: generate k-size candidates from (k-1)-size prevalent patterns
     for (size_t i = 0; i < prevPrevalent.size(); i++) {
         for (size_t j = i + 1; j < prevPrevalent.size(); j++) {
@@ -215,22 +219,15 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
             }
             
             // Generate new candidate
-			std::set<FeatureType> candidateSet;
+			Colocation candidate;
             if (featureCount.at(prevPrevalent[i].back()) <= featureCount.at(prevPrevalent[j].back())) {
-                candidateSet = std::set<FeatureType>(prevPrevalent[i].begin(),
-                    prevPrevalent[i].end());
-                candidateSet.insert(prevPrevalent[j].back());
+                candidate = prevPrevalent[i];
+                candidate.push_back(prevPrevalent[j].back());
             }else {
-                candidateSet = std::set<FeatureType>(prevPrevalent[j].begin(),
-                    prevPrevalent[j].end());
-                candidateSet.insert(prevPrevalent[i].back());
+				candidate = prevPrevalent[j];
+				candidate.push_back(prevPrevalent[i].back());
             }
             
-            if (candidateSet.size() != patternSize + 1) {
-                continue;
-            }
-
-            Colocation candidate(candidateSet.begin(), candidateSet.end());
             candidates.push_back(candidate);
         }
     }
@@ -578,21 +575,43 @@ std::vector<Colocation> JoinlessMiner::selectPrevColocations(
     double delta
 ) {
     std::vector<Colocation> prevalentPatterns;
-    // Iterate through all candidate patterns generated in this step
+
     for (const auto& candidate : candidates) {
-		double wpi = 1.1;
-		for (const FeatureType& feature : candidate) {
-			double pr = calculatePR(feature, candidate, tableInstances, featureCount);
-			double ri = calculateRareIntensity(feature, candidate, featureCount, delta);
-			double w = 1.0 / ri;
-			double wpr = pr * w;
-            if (wpr < wpi) {
+        // Init WPI with a safe max value
+        double wpi = 1.0;
+        bool first = true;
+
+        for (const FeatureType& feature : candidate) {
+            double pr = calculatePR(feature, candidate, tableInstances, featureCount);
+            double ri = calculateRareIntensity(feature, candidate, featureCount, delta);
+
+            // Safety check for RI
+            double w = 0.0;
+            if (ri > Constants::EPSILON_SMALL) { // Epsilon check
+                w = 1.0 / ri;
+            }
+            else {
+                // If RI is 0 (should imply feature not in pattern or error), weight is huge or handled
+                w = 0.0;
+            }
+
+            double wpr = pr * w;
+
+            if (first) {
                 wpi = wpr;
+                first = false;
+            }
+            else {
+                if (wpr < wpi) {
+                    wpi = wpr;
+                }
             }
         }
+
+        // Check threshold
         if (wpi >= minPrev) {
             prevalentPatterns.push_back(candidate);
-		}
+        }
     }
 
     return prevalentPatterns;

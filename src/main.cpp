@@ -19,9 +19,9 @@
 
 int main(int argc, char* argv[]) {
     // Open file to write results
-    std::ofstream out("mining_report.txt");
+    /*std::ofstream out("D:/tai_lieu_hoc_AI/spatial_data_mining/Efficient-Co-location-Pattern-Mining-in-Large-Spatial-Datasets-with-Rare-Features/mining_report.txt");
     std::streambuf* coutbuf = std::cout.rdbuf();
-    std::cout.rdbuf(out.rdbuf());
+    std::cout.rdbuf(out.rdbuf());*/
     auto programStart = std::chrono::high_resolution_clock::now();
 
     // ========================================================================
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
         std::cout << "\n";
     }
 
-    std::cout.rdbuf(coutbuf);
+    /*std::cout.rdbuf(coutbuf);*/
     std::cout << "Mining completed. Report saved to 'mining_report.txt'.\n";
 
     return 0;
