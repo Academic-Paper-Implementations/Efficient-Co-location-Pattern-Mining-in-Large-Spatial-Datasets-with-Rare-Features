@@ -67,7 +67,7 @@ double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std:
 double calculatePR(
     const FeatureType& featureType,
     const Colocation& pattern,
-    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
     const std::map<FeatureType, int>& featureCounts);
 /**
  * @brief Calculate Rare Intensity (RI) for a feature in a pattern
@@ -96,7 +96,7 @@ double calculateRareIntensity(
  */
 double calculatePI(
     const Colocation& pattern,
-    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
     const std::map<FeatureType, int>& featureCounts);
 /**
 * @brief Recursive helper to find all combinations of spatial instances

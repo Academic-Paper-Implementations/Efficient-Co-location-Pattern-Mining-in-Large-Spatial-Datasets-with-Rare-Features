@@ -51,6 +51,9 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
             [](const OrderedNeigh& a, const OrderedNeigh& b) {
                 return a.center->id < b.center->id;
             });
+		/////////////////////////////////////////////////////////
+        // TODO: edit sort by other way, this way is wrong.
+		/////////////////////////////////////////////////////////
 
         for (const auto& star : sortedStarList) {
             NRNode* centerNode = new NRNode(INSTANCE_NODE);
@@ -75,6 +78,9 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
                     if (countA != countB) return countA < countB;
                     return a < b; // Lexicographic tie-breaker
                 });
+            /////////////////////////////////////////////////////////
+            // TODO: change this sort function to utils.h.
+            /////////////////////////////////////////////////////////
 
             // Create FEATURE_NODE for each neighbor feature type
             for (const auto& neighborFeatureType : neighborFeatureTypes) {
@@ -93,6 +99,9 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
                     if (a->type != b->type) return a->type < b->type;
                     return a->id < b->id;
                 });
+                /////////////////////////////////////////////////////////
+                // TODO: edit sort by other way, this way is wrong.
+                /////////////////////////////////////////////////////////
 
                 // Create single INSTANCE_VECTOR_NODE to store vector of neighbor instances
                 NRNode* instanceVectorNode = new NRNode(INSTANCE_VECTOR_NODE);
