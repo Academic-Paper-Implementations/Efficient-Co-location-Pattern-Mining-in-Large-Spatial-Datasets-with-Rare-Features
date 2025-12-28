@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     // Step 1: Load Configuration
     // ========================================================================
     printSectionHeader("STEP 1: CONFIGURATION");
-    std::string config_path = (argc > 1) ? argv[1] : "config.txt";
+    std::string config_path = (argc > 1) ? argv[1] : "./config/config.txt";
     AppConfig config = ConfigLoader::load(config_path);
 
     std::cout << std::left << std::setw(25) << "Dataset Path:" << config.datasetPath << "\n";
