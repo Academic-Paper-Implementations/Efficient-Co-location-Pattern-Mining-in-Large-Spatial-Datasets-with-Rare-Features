@@ -10,7 +10,7 @@
 
 namespace Constants {
     // Epsilon values for numerical stability
-    constexpr double EPSILON_SMALL = 1e-6;      ///< Small epsilon for division by zero protection
+    constexpr double EPSILON_SMALL = 1e-9;      ///< Small epsilon for division by zero protection
     constexpr double EPSILON_DELTA = 1e-9;      ///< Delta threshold for rare intensity calculations
     
     // Progress reporting

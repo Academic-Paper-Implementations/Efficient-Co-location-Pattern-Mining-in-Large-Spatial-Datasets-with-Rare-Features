@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @brief Entry point for the with rare colocation pattern mining application
+ * @brief Entry point with enhanced scientific logging
  */
 
 #include "config.h"
@@ -17,103 +17,117 @@
 #include <iomanip>
 #include <psapi.h>
 
+ // Helper for separating sections
+void printSectionHeader(const std::string& title) {
+    std::cout << "\n" << std::string(60, '=') << "\n";
+    std::cout << " " << title << "\n";
+    std::cout << std::string(60, '=') << "\n";
+}
+
 int main(int argc, char* argv[]) {
-    // Open file to write results
-    std::ofstream out("mining_report.txt");
-    std::streambuf* coutbuf = std::cout.rdbuf();
-    std::cout.rdbuf(out.rdbuf());
     auto programStart = std::chrono::high_resolution_clock::now();
 
     // ========================================================================
     // Step 1: Load Configuration
     // ========================================================================
-    std::cout << "[DEBUG] Step 1: Loading configuration...\n";
-    std::string config_path = (argc > 1) ? argv[1] : "config/config.txt";
+    printSectionHeader("STEP 1: CONFIGURATION");
+    std::string config_path = (argc > 1) ? argv[1] : "config.txt";
     AppConfig config = ConfigLoader::load(config_path);
-    std::cout << "[DEBUG] Step 1: Configuration loaded successfully.\n";
-    std::cout << "Running Joinless with d=" << config.neighborDistance << "...\n";
+
+    std::cout << std::left << std::setw(25) << "Dataset Path:" << config.datasetPath << "\n";
+    std::cout << std::left << std::setw(25) << "Neighbor Distance (d):" << config.neighborDistance << "\n";
+    std::cout << std::left << std::setw(25) << "Min Prevalence:" << config.minPrev << "\n";
 
     // ========================================================================
     // Step 2: Load Data
     // ========================================================================
-    std::cout << "[DEBUG] Step 2: Loading data from " << config.datasetPath << "...\n";
+    printSectionHeader("STEP 2: LOAD DATA");
     auto t_load_start = std::chrono::high_resolution_clock::now();
     auto instances = DataLoader::load_csv(config.datasetPath);
     auto t_load_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[DEBUG] Step 2: Loaded " << instances.size() << " instances.\n";
+    double load_time = std::chrono::duration<double, std::milli>(t_load_end - t_load_start).count();
+
+    std::cout << "[DATA] Loaded " << instances.size() << " instances.\n";
+    std::cout << "[TIME] Load time: " << std::fixed << std::setprecision(2) << load_time << " ms\n";
 
     // ========================================================================
     // Step 3: Build Spatial Index
     // ========================================================================
-    // Pass distance parameter d from config to spatial index
-    std::cout << "[DEBUG] Step 3: Building spatial index with d=" << config.neighborDistance << "...\n";
+    printSectionHeader("STEP 3: SPATIAL INDEXING");
     auto t_idx_start = std::chrono::high_resolution_clock::now();
     SpatialIndex spatial_idx(config.neighborDistance);
     auto neighborPairs = spatial_idx.findNeighborPair(instances);
     auto t_idx_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[DEBUG] Step 3: Found " << neighborPairs.size() << " neighbor pairs.\n";
+    double idx_time = std::chrono::duration<double, std::milli>(t_idx_end - t_idx_start).count();
+
+    std::cout << "[DATA] Found " << neighborPairs.size() << " neighbor pairs.\n";
+    std::cout << "[TIME] Indexing time: " << std::fixed << std::setprecision(2) << idx_time << " ms\n";
 
     // ========================================================================
     // Step 4: Materialize Neighborhoods
     // ========================================================================
-    std::cout << "[DEBUG] Step 4: Materializing neighborhoods...\n";
+    printSectionHeader("STEP 4: NEIGHBORHOOD MATERIALIZATION");
     auto t_mat_start = std::chrono::high_resolution_clock::now();
-	std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
-	NeighborhoodMgr neighbor_mgr;
+    std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
+
+    NeighborhoodMgr neighbor_mgr;
     neighbor_mgr.buildFromPairs(neighborPairs, featureCount);
-    std::unordered_map<FeatureType, std::vector<OrderedNeigh>> orderedNeighbors = neighbor_mgr.getOrderedNeighbors();
-	NRTree orderedNRTree;
-	orderedNRTree.build(neighbor_mgr, featureCount);
+
+    NRTree orderedNRTree;
+    orderedNRTree.build(neighbor_mgr, featureCount);
+
     auto t_mat_end = std::chrono::high_resolution_clock::now();
-    std::cout << "[DEBUG] Step 4: Neighborhoods materialized.\n";
+    double mat_time = std::chrono::duration<double, std::milli>(t_mat_end - t_mat_start).count();
+
+    std::cout << "[INFO] Feature Counts:\n";
+    for (const auto& pair : featureCount) {
+        std::cout << "   - " << std::left << std::setw(5) << pair.first << ": " << pair.second << " instances\n";
+    }
+    std::cout << "[TIME] Materialization time: " << std::fixed << std::setprecision(2) << mat_time << " ms\n";
 
     // ========================================================================
     // Step 5: Mine Colocation Patterns
     // ========================================================================
-    std::cout << "[DEBUG] Step 5: Mining colocation patterns with minPrev=" << config.minPrev << "...\n";
+    printSectionHeader("STEP 5: MINING PROCESS");
     JoinlessMiner miner;
-    
-    // Define progress callback lambda function
-    // This callback reports mining progress to the console
+
+    // Callback đơn giản hơn, không dùng \r để tránh mất log debug
     auto progressCallback = [](int currentStep, int totalSteps, const std::string& message, double percentage) {
-        std::cout << "\r[PROGRESS] " << std::fixed << std::setprecision(1) << percentage 
-                  << "% (" << currentStep << "/" << totalSteps << ") - " << message;
-        std::cout.flush();
-        
-        // Print newline when completed
-        if (percentage >= 100.0) {
-            std::cout << std::endl;
-        }
-    };
-    
+        // Chỉ in các mốc quan trọng hoặc message cụ thể nếu cần, 
+        // ở đây ta để hàm mineColocations tự in log chi tiết nên callback có thể để trống hoặc in tối giản
+        // std::cout << "[PROG] " << message << "\n"; 
+        };
+
     auto colocations = miner.mineColocations(config.minPrev, orderedNRTree, instances, featureCount, progressCallback);
-    std::cout << "[DEBUG] Step 5: Mining completed.\n";
-    
+
     // ========================================================================
-    // Print Results
+    // Final Report
     // ========================================================================
+    printSectionHeader("FINAL SUMMARY");
+
     auto programEnd = std::chrono::high_resolution_clock::now();
     double totalTimeSec = std::chrono::duration<double>(programEnd - programStart).count();
     double maxMemory = getMemoryUsageMB();
 
-    std::cout << "\n==========================================================\n";
-    std::cout << "                   FINAL SUMMARY                          \n";
-    std::cout << "==========================================================\n";
-    std::cout << "Total Prevalent Colocations Found: " << colocations.size() << "\n";
-    std::cout << "Total Execution Time: " << std::fixed << std::setprecision(4) << totalTimeSec << " seconds\n";
-    std::cout << "Peak Memory Usage (Approx): " << std::fixed << std::setprecision(2) << maxMemory << " MB\n";
+    std::cout << std::left << std::setw(35) << "Total Prevalent Patterns:" << colocations.size() << "\n";
+    std::cout << std::left << std::setw(35) << "Total Execution Time:" << std::fixed << std::setprecision(4) << totalTimeSec << " s\n";
+    std::cout << std::left << std::setw(35) << "Peak Memory Usage:" << std::fixed << std::setprecision(2) << maxMemory << " MB\n";
 
-    std::cout << "\n[DETAILED RESULTS]\n";
-    for (const auto& col : colocations) {
-        for (size_t i = 0; i < col.size(); ++i) {
-            if (i > 0) std::cout << " - ";
-            std::cout << col[i];
+    if (!colocations.empty()) {
+        std::cout << "\n[PATTERNS FOUND]\n";
+        int idx = 1;
+        for (const auto& col : colocations) {
+            std::cout << std::right << std::setw(3) << idx++ << ". {";
+            for (size_t i = 0; i < col.size(); ++i) {
+                std::cout << (i > 0 ? ", " : "") << col[i];
+            }
+            std::cout << "}\n";
         }
-        std::cout << "\n";
+    }
+    else {
+        std::cout << "\n[RESULT] No patterns found satisfying the threshold.\n";
     }
 
-    std::cout.rdbuf(coutbuf);
-    std::cout << "Mining completed. Report saved to 'mining_report.txt'.\n";
-
+    std::cout << "\nMining completed.\n";
     return 0;
 }
