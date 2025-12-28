@@ -7,6 +7,7 @@
 #include <memory>
 #include "neighborhood_mgr.h" // To use struct OrderedNeigh and FeatureType
 #include "types.h"
+#include "utils.h"
 
 // --- [IMPORTANT] FORWARD DECLARATION ---
 class NeighborhoodMgr;

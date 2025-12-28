@@ -19,6 +19,7 @@
 #include <omp.h> 
 #include <iomanip>
 #include <chrono>
+#include <unordered_set>
 
 std::vector<Colocation> JoinlessMiner::mineColocations(
     double minPrev,

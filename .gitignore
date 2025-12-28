@@ -30,5 +30,6 @@ spatial_index
 /mining_report.txt
 /src/test.cpp
 out/
+/src/test_mgr.cpp
 /data/plant_big_100_ex_checkin.csv
 /enc_temp_folder

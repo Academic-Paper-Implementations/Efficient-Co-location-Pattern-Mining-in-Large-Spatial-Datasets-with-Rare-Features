@@ -1,11 +1,12 @@
 ﻿#include "NRTree.h"
+#include "utils.h"
 
 NRTree::NRTree() : root(std::make_unique<NRNode>(ROOT_NODE)) {
 }
 
 NRTree::~NRTree() = default;
 
-void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts) {
+void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances) {
     // 0. Reset tree if old data exists
     root = std::make_unique<NRNode>(ROOT_NODE);
 
