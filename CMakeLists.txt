@@ -30,8 +30,17 @@ add_executable (main ${SOURCE_FILES})
 # ======================================================================
 # Runtime config copy (IMPORTANT)
 # ======================================================================
-file(COPY
-    ${CMAKE_SOURCE_DIR}/config
-    ${CMAKE_SOURCE_DIR}/data
-    DESTINATION ${CMAKE_BINARY_DIR}
+add_custom_command(TARGET main POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/config"
+        "$<TARGET_FILE_DIR:main>/config"
+    COMMENT "Copying config folder to output directory..."
+)
+
+# 2. Copy thư mục data
+add_custom_command(TARGET main POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/data"
+        "$<TARGET_FILE_DIR:main>/data"
+    COMMENT "Copying data folder to output directory..."
 )
