@@ -36,33 +36,14 @@ private:
 
     std::map<Colocation, std::vector<ColocationInstance>> genTableInstance(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance>& prevTableInstances,
+        const std::map<Colocation, std::vector<ColocationInstance>>& prevTableInstances,
 		const NRTree& orderedNRTree
-    );
-
-    // Helper function to find neighbors of an instance for a specific feature type from NRTree
-    std::vector<const SpatialInstance*> findNeighbors(
-        const NRTree& tree,
-        const SpatialInstance* instance,
-        const FeatureType& featureType
-    );
-
-    // Helper function to calculate S(I, f) = Neigh(o1, f) ∩ ··· ∩ Neigh(ok, f) (Definition 8)
-    std::vector<const SpatialInstance*> findExtendedSet(
-        const NRTree& tree,
-        const ColocationInstance& instance,
-        const FeatureType& featureType
-    );
-
-    std::vector<ColocationInstance> calculateWPI(
-        const std::vector<Colocation>& candidates,
-		const std::vector<ColocationInstance>& tableInstances
     );
 
    
     std::vector<Colocation> selectPrevColocations(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance>& tableInstances,
+        const std::map<Colocation, std::vector<ColocationInstance>>& tableInstances,
         double minPrev,
         const std::map<FeatureType, int>& featureCount, // Cần thêm để tính PR/RI
         double delta
@@ -109,7 +90,7 @@ public:
     std::vector<Colocation> filterCandidates(
         const std::vector<Colocation>& candidates,
 		const std::vector<Colocation>& prevPrevalent,
-		const std::vector<ColocationInstance>& tableInstance,
+		const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
 		double minPrev,
 		std::map<FeatureType, int> featureCount,
 		double delta

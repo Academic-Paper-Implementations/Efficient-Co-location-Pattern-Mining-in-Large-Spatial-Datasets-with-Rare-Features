@@ -143,7 +143,7 @@ double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std:
 double calculatePR(
     const FeatureType& featureType,
     const Colocation& pattern,
-    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
     const std::map<FeatureType, int>& featureCounts) 
 {
     // 1. Find the index of featureType in the pattern
@@ -162,10 +162,17 @@ double calculatePR(
 
     // 2. Count distinct instances of featureType in T(C) to get numerator
     std::set<instanceID> distinctInstances;
-    for (const auto& row : tableInstance) {
-        // Safety check: row size should match pattern size
-        if (featureIndex < static_cast<int>(row.size()) && row[featureIndex]) {
-            distinctInstances.insert(row[featureIndex]->id);
+
+	// Look up tableInstance for the given pattern
+    auto it = tableInstance.find(pattern);
+    if (it != tableInstance.end()) {
+        const std::vector<ColocationInstance>& instancesList = it->second;
+
+		// Iterate through each row in the table instance
+        for (const auto& row : instancesList) {
+            if (featureIndex < static_cast<int>(row.size()) && row[featureIndex]) {
+                distinctInstances.insert(row[featureIndex]->id);
+            }
         }
     }
 
@@ -236,7 +243,7 @@ double calculateRareIntensity(
 // PI(C) = min_{i=1 to k} { PR(fi, C) }
 double calculatePI(
     const Colocation& pattern,
-    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
     const std::map<FeatureType, int>& featureCounts) 
 {
     if (pattern.empty()) {

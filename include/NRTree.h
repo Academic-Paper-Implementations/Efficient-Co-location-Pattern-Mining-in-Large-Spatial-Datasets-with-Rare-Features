@@ -16,8 +16,7 @@ enum NodeType {
     ROOT_NODE,
     FEATURE_NODE,
     INSTANCE_NODE,
-    INSTANCE_VECTOR_NODE,  // Node để lưu vector các instances (dùng ở Level 4)
-    NEIGHBOR_NODE
+    INSTANCE_VECTOR_NODE
 };
 
 // Structure of a node in the NR-Tree
@@ -49,7 +48,7 @@ private:
     void printRecursive(NRNode* node, int level) const;
 
 public:
-    inline NRTree();
+    NRTree();
     ~NRTree();
 
     // Most important function: Build tree from NeighborhoodMgr results
