@@ -7,6 +7,7 @@
 
 #include "miner.h"
 #include "utils.h"
+#include "constants.h"
 #include "neighborhood_mgr.h"
 #include "NRTree.h"
 #include "types.h"
@@ -65,14 +66,14 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         totalIterations = currentIteration;
 
         // Calculate progress
-        double progressPercent = std::min(95.0, (static_cast<double>(currentIteration) / maxK) * 95.0);
+        double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
 
         if (progressCallback) {
             progressCallback(currentIteration, maxK,
                 "Processing iteration k=" + std::to_string(k) + "...",
                 progressPercent);
         }
-        std::vector<ColocationInstance> tableInstances;
+        std::map<Colocation, std::vector<ColocationInstance>> tableInstances;
 
         // Step 8: Ck = gen_candidate_patterns(Pk-1, k)
         auto t1_start = std::chrono::high_resolution_clock::now();
@@ -90,7 +91,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         }
 
         if (progressCallback) {
-            double progressPercent = std::min(95.0, (static_cast<double>(currentIteration) / maxK) * 95.0);
+            double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
             progressCallback(currentIteration, maxK,
                 "Filtering candidates (Lemma 2 & 3)...",
                 progressPercent);
@@ -122,7 +123,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         printDuration("Step 10: gen_table_instances (k=" + std::to_string(k) + ")", t3_start, t3_end);
 
         if (progressCallback) {
-            double progressPercent = std::min(95.0, (static_cast<double>(currentIteration) / maxK) * 95.0);
+            double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
             progressCallback(currentIteration, maxK,
                 "Calculating WPI and selecting prevalent patterns...",
                 progressPercent);
@@ -134,7 +135,9 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         prevColocations = selectPrevColocations(
             fiteredCandidates,
             tableInstances,
-            minPrev
+            minPrev,
+			featureCount,
+			delta
         );
         auto t4_end = std::chrono::high_resolution_clock::now();
         printDuration("Step 11-12: select_prevalent_patterns (k=" + std::to_string(k) + ")", t4_start, t4_end);
@@ -150,7 +153,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
             std::cout << "[DEBUG] Step 12: Found " << prevColocations.size() << " prevalent patterns for k=" << k << "\n";
 
             if (progressCallback) {
-                double progressPercent = std::min(95.0, (static_cast<double>(currentIteration) / maxK) * 95.0);
+                double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
                 progressCallback(currentIteration, maxK,
                     "Found " + std::to_string(prevColocations.size()) + " prevalent k=" + std::to_string(k) + " co-locations",
                     progressPercent);
@@ -158,7 +161,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         }
         else {
             if (progressCallback) {
-                double progressPercent = std::min(95.0, (static_cast<double>(currentIteration) / maxK) * 95.0);
+                double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
                 progressCallback(currentIteration, maxK,
                     "No prevalent k=" + std::to_string(k) + " co-locations found",
                     progressPercent);
@@ -233,6 +236,7 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
             }
 
             Colocation candidate(candidateSet.begin(), candidateSet.end());
+            candidates.push_back(candidate);
         }
     }
 
@@ -514,3 +518,4 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
 
     return result;
 }
+
