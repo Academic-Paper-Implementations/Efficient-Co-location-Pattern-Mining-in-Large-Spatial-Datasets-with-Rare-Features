@@ -326,7 +326,7 @@ std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
         if (featureNode->type == FEATURE_NODE && featureNode->featureType == instance->type) {
             // Find the instance node for this specific instance (Level 2)
             for (const auto* instanceNode : featureNode->children) {
-                if (instanceNode->type == INSTANCE_NODE && instanceNode->data == instance) {
+                if (instanceNode->type == INSTANCE_NODE && instanceNode->data->id == instance->id) {
                     // Find the neighbor feature node for the target feature type (Level 3)
                     for (const auto* neighborFeatureNode : instanceNode->children) {
                         if (neighborFeatureNode->type == FEATURE_NODE && 
@@ -367,12 +367,23 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
     for (size_t i = 1; i < instance.size(); i++) {
         std::vector<const SpatialInstance*> neighbors = findNeighbors(tree, instance[i], featureType);
 
-        // Calculate intersection: keep only instances that are in both sets
-        std::unordered_set<const SpatialInstance*> lookupTable(neighbors.begin(), neighbors.end());
+        if (neighbors.empty()) {
+            return {}; // Một ông không có neighbor thì giao bằng rỗng luôn
+        }
+
+        // --- [SỬA TẠI ĐÂY] ---
+        // Dùng ID để tạo bảng tra cứu (Lookup Table)
+        // Giả sử ID là int hoặc string đều dùng được cách này
+        std::set<decltype(instance[0]->id)> neighborIDs;
+        for (const auto* ptr : neighbors) {
+            neighborIDs.insert(ptr->id);
+        }
+
         std::vector<const SpatialInstance*> newIntersection;
-        newIntersection.reserve(intersection.size());
+
+        // Chỉ giữ lại những thằng trong intersection có ID nằm trong neighborIDs
         for (const auto* ptr : intersection) {
-            if (lookupTable.count(ptr)) {
+            if (neighborIDs.count(ptr->id)) {
                 newIntersection.push_back(ptr);
             }
         }
