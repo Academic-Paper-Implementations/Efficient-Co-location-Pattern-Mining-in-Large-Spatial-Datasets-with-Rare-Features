@@ -12,7 +12,7 @@
 #include "NRTree.h"
 #include "types.h"
 #include <algorithm>
-#include <set>
+#include <unordered_set>
 #include <map>
 #include <string>
 #include <iostream>
@@ -28,25 +28,25 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     const std::map<FeatureType, int>& featureCount,
     ProgressCallback progressCb
 ) {
-    // Start timer
     auto minerStart = std::chrono::high_resolution_clock::now();
-
-    // Assign parameters to member variables for use in other methods
     this->progressCallback = progressCb;
 
-    // Variables: (a) delta; (b) k; (c) Ck; (d) Tk; (e) Pk; (f) Neigh
-    // Steps 1-5: Initialization (counting instances, sorting features, calculating delta, gen_Neigh, gen_ordered-NR-tree)
-    // Note: Passed in via arguments or pre-calculated in caller
-    int k = 2;  // Start with size-2 patterns
+    // --- INIT ---
+    int k = 2;
     std::vector<FeatureType> types = getAllObjectTypes(instances);
-	std::vector<FeatureType> sortedTypes = featureSort(types, instances);
-	double delta = calculateDelta(sortedTypes, featureCount);
+    std::vector<FeatureType> sortedTypes = featureSort(types, instances);
+    double delta = calculateDelta(sortedTypes, featureCount);
 
+    // DEBUG: In ra thứ tự Feature sau khi sort (Rất quan trọng)
+    std::cout << "\n[DEBUG INIT] Feature Sort Order (Rare -> Frequent):\n";
+    for (const auto& t : sortedTypes) {
+        std::cout << "   " << t << ": " << featureCount.at(t) << " instances\n";
+    }
+    std::cout << "------------------------------------------------\n";
 
-    // P1 = F (Set of size-1 prevalent co-locations)
     std::vector<Colocation> prevColocations;
-    // T1 = O (Table instance of size-1)
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
+
     // Khởi tạo T1 (Table Instance k=1)
     // Map: {Key: [FeatureType], Value: List of rows}
     for (const auto& instance : instances) {
@@ -54,139 +54,136 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         ColocationInstance row = { &instance };
         prevTableInstances[key].push_back(row);
     }
+
     std::vector<Colocation> allPrevalentColocations;
 
-    // Estimate total iterations (max pattern size is number of types)
-    int maxK = static_cast<int>(types.size());
-    int currentIteration = 0;
-    int totalIterations = 0;
+    // Khởi tạo P1 (Prevalent k=1)
+    for (auto t : sortedTypes) prevColocations.push_back({ t });
 
-    if (progressCallback) {
-        progressCallback(0, maxK, "Initializing mining process (Steps 1-6)...", 0.0);
-    }
-
-    // Step 6: let P1 = F, T1 = O, k = 2
-    for (auto t : types) prevColocations.push_back({ t });
-
-    // Step 7: while Pk-1 not empty do
+    // --- MAIN LOOP ---
     while (!prevColocations.empty()) {
-        currentIteration++;
-        totalIterations = currentIteration;
+        std::cout << "\n>>> ITERATION K = " << k << " <<<\n";
 
-        // Calculate progress
-        double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
-
-        if (progressCallback) {
-            progressCallback(currentIteration, maxK,
-                "Processing iteration k=" + std::to_string(k) + "...",
-                progressPercent);
-        }
         std::map<Colocation, std::vector<ColocationInstance>> tableInstances;
 
-        // Step 8: Ck = gen_candidate_patterns(Pk-1, k)
+        // 1. Generate Candidates
         auto t1_start = std::chrono::high_resolution_clock::now();
         std::vector<Colocation> candidates = generateCandidates(prevColocations, featureCount);
         auto t1_end = std::chrono::high_resolution_clock::now();
-        printDuration("Step 8: gen_candidate_patterns (k=" + std::to_string(k) + ")", t1_start, t1_end);
 
-        if (candidates.empty()) {
-            if (progressCallback) {
-                progressCallback(currentIteration, maxK,
-                    "No more candidates found. Mining completed.",
-                    100.0);
+        std::cout << "   [GEN] Generated: " << candidates.size() << " candidates. ";
+        printDuration("", t1_start, t1_end);
+
+        // --- DEBUG CHI TIẾT CANDIDATES ---
+        if (!candidates.empty()) {
+            std::cout << "      List of Candidates:\n";
+            for (const auto& cand : candidates) {
+                std::cout << "      - { ";
+                for (size_t i = 0; i < cand.size(); ++i) std::cout << cand[i] << (i < cand.size() - 1 ? ", " : "");
+                std::cout << " }\n";
             }
-            break;
         }
+        // --------------------------------
 
-        if (progressCallback) {
-            double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
-            progressCallback(currentIteration, maxK,
-                "Filtering candidates (Lemma 2 & 3)...",
-                progressPercent);
-        }
+        if (candidates.empty()) break;
 
-        // Step 9: filter_candidate_patterns(Ck, Pk-1)
-        // Uses Lemma 2 and Lemma 3 to prune search space
+        // 2. Filter Candidates
         auto t2_start = std::chrono::high_resolution_clock::now();
-		std::vector<Colocation> fiteredCandidates = candidates;
-        if (k!=2){
-            fiteredCandidates = filterCandidates(candidates, prevColocations, prevTableInstances, minPrev, featureCount, delta);
+        std::vector<Colocation> filteredCandidates = candidates;
+        if (k != 2) {
+            filteredCandidates = filterCandidates(candidates, prevColocations, prevTableInstances, minPrev, featureCount, delta);
         }
         auto t2_end = std::chrono::high_resolution_clock::now();
-        printDuration("Step 9: filter_candidate_patterns (k=" + std::to_string(k) + ")", t2_start, t2_end);
 
-        // Step 10: Tk = gen_table_instances(Ck, Tk-1, ordered-NR-tree)
+        std::cout << "   [FLT] Filtered: " << candidates.size() << " -> " << filteredCandidates.size() << " candidates. ";
+        printDuration("", t2_start, t2_end);
+
+        if (filteredCandidates.empty()) break;
+
+        // 3. Generate Table Instances (Phần quan trọng nhất cần check)
         auto t3_start = std::chrono::high_resolution_clock::now();
-        tableInstances = genTableInstance(
-            fiteredCandidates,
-            prevTableInstances,
-            orderedNRTree
-        );
+        tableInstances = genTableInstance(filteredCandidates, prevTableInstances, orderedNRTree);
         auto t3_end = std::chrono::high_resolution_clock::now();
-        printDuration("Step 10: gen_table_instances (k=" + std::to_string(k) + ")", t3_start, t3_end);
 
-        if (progressCallback) {
-            double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
-            progressCallback(currentIteration, maxK,
-                "Calculating WPI and selecting prevalent patterns...",
-                progressPercent);
-        }
+        size_t totalRows = 0;
+        for (const auto& pair : tableInstances) totalRows += pair.second.size();
 
-        // Step 11: calculate_WPI(Ck, Tk)
-        // Step 12: Pk = select_prevalent_patterns(Ck, Tk, min_prev)
-        auto t4_start = std::chrono::high_resolution_clock::now();
-        prevColocations = selectPrevColocations(
-            fiteredCandidates,
-            tableInstances,
-            minPrev,
-			featureCount,
-			delta
-        );
-        auto t4_end = std::chrono::high_resolution_clock::now();
-        printDuration("Step 11-12: select_prevalent_patterns (k=" + std::to_string(k) + ")", t4_start, t4_end);
+        std::cout << "   [VER] Verified: Built instance table with " << totalRows << " rows. ";
+        printDuration("", t3_start, t3_end);
 
-
-        if (!prevColocations.empty()) {
-            allPrevalentColocations.insert(
-                allPrevalentColocations.end(),
-                prevColocations.begin(),
-                prevColocations.end()
-            );
-
-            std::cout << "[DEBUG] Step 12: Found " << prevColocations.size() << " prevalent patterns for k=" << k << "\n";
-
-            if (progressCallback) {
-                double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
-                progressCallback(currentIteration, maxK,
-                    "Found " + std::to_string(prevColocations.size()) + " prevalent k=" + std::to_string(k) + " co-locations",
-                    progressPercent);
-            }
+        // --- DEBUG CHI TIẾT INSTANCE TABLE ---
+        std::cout << "      [DEBUG VERIFY] Instance Table Details:\n";
+        if (tableInstances.empty()) {
+            std::cout << "      !!! WARNING: No instances found for ANY candidate.\n";
+            std::cout << "      !!! Check: 1. NRTree correctness. 2. NeighborDistance (d) too small?\n";
         }
         else {
-            if (progressCallback) {
-                double progressPercent = std::min(Constants::MAX_PROGRESS_PERCENT, (static_cast<double>(currentIteration) / maxK) * Constants::MAX_PROGRESS_PERCENT);
-                progressCallback(currentIteration, maxK,
-                    "No prevalent k=" + std::to_string(k) + " co-locations found",
-                    progressPercent);
+            for (const auto& cand : filteredCandidates) {
+                // In ra candidate
+                std::cout << "      Pattern { ";
+                for (const auto& f : cand) std::cout << f << " ";
+                std::cout << "}: ";
+
+                // Kiểm tra xem candidate này có instance nào không
+                auto it = tableInstances.find(cand);
+                if (it != tableInstances.end()) {
+                    const auto& rows = it->second;
+                    std::cout << rows.size() << " instances found.\n";
+
+                    // In thử tối đa 3 dòng đầu tiên để check ID
+                    int printLimit = 3;
+                    for (size_t i = 0; i < std::min((size_t)rows.size(), (size_t)printLimit); ++i) {
+                        std::cout << "         Row " << i + 1 << ": [ ";
+                        for (const auto* inst : rows[i]) {
+                            std::cout << inst->id << "(" << inst->type << ") ";
+                        }
+                        std::cout << "]\n";
+                    }
+                    if (rows.size() > printLimit) std::cout << "         ... (more)\n";
+
+                }
+                else {
+                    std::cout << "0 instances (Empty).\n";
+                }
             }
         }
+        // -------------------------------------
 
-        // Prepare Tk-1 for next iteration
+        // 4. Select Prevalent
+        auto t4_start = std::chrono::high_resolution_clock::now();
+        prevColocations = selectPrevColocations(
+            filteredCandidates,
+            tableInstances,
+            minPrev,
+            featureCount,
+            delta
+        );
+        auto t4_end = std::chrono::high_resolution_clock::now();
+
+        std::cout << "   [SEL] Selected: " << prevColocations.size() << " prevalent patterns. ";
+        printDuration("", t4_start, t4_end);
+
+        // Debug PI values (nếu cần thiết thì bỏ comment đoạn này)
+        /*
+        for (const auto& cand : filteredCandidates) {
+             double pi = calculatePI(cand, tableInstances, featureCount);
+             std::cout << "      PI({ ";
+             for(auto f : cand) std::cout << f << " ";
+             std::cout << "}) = " << pi << " (Threshold: " << minPrev << ")\n";
+        }
+        */
+
+        if (!prevColocations.empty()) {
+            allPrevalentColocations.insert(allPrevalentColocations.end(), prevColocations.begin(), prevColocations.end());
+        }
+
         prevTableInstances = std::move(tableInstances);
-
-        // Step 13: k = k + 1
         k++;
-    } // Step 14: end while
-
-    // Step 15: return union(P2, ..., Pk-1)
-    if (progressCallback) {
-        progressCallback(maxK, maxK,
-            "Mining completed! Total prevalent co-locations: " + std::to_string(allPrevalentColocations.size()),
-            100.0);
     }
 
     auto minerEnd = std::chrono::high_resolution_clock::now();
-    printDuration("TOTAL MINING TIME (Algorithm 1)", minerStart, minerEnd);
+    std::cout << "\n[MINER] Total Mining Time: "
+        << std::chrono::duration<double, std::milli>(minerEnd - minerStart).count() << " ms\n";
 
     return allPrevalentColocations;
 }
@@ -206,8 +203,6 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
 
     size_t patternSize = prevPrevalent[0].size();
 
-    std::set<Colocation> prevSet(prevPrevalent.begin(), prevPrevalent.end());
-
     // Join phase: generate k-size candidates from (k-1)-size prevalent patterns
     for (size_t i = 0; i < prevPrevalent.size(); i++) {
         for (size_t j = i + 1; j < prevPrevalent.size(); j++) {
@@ -223,22 +218,15 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
             }
             
             // Generate new candidate
-			std::set<FeatureType> candidateSet;
+			Colocation candidate;
             if (featureCount.at(prevPrevalent[i].back()) <= featureCount.at(prevPrevalent[j].back())) {
-                candidateSet = std::set<FeatureType>(prevPrevalent[i].begin(),
-                    prevPrevalent[i].end());
-                candidateSet.insert(prevPrevalent[j].back());
+                candidate = prevPrevalent[i];
+                candidate.push_back(prevPrevalent[j].back());
             }else {
-                candidateSet = std::set<FeatureType>(prevPrevalent[j].begin(),
-                    prevPrevalent[j].end());
-                candidateSet.insert(prevPrevalent[i].back());
+				candidate = prevPrevalent[j];
+				candidate.push_back(prevPrevalent[i].back());
             }
             
-            if (candidateSet.size() != patternSize + 1) {
-                continue;
-            }
-
-            Colocation candidate(candidateSet.begin(), candidateSet.end());
             candidates.push_back(candidate);
         }
     }
@@ -265,7 +253,8 @@ std::vector<Colocation> JoinlessMiner::filterCandidates(
     if (candidates.empty() || prevPrevalent.empty()) {
         return filteredCandidates;
     }
-    std::set<Colocation> prevSet(prevPrevalent.begin(), prevPrevalent.end());
+    std::vector<Colocation> sortedPrev = prevPrevalent;
+    std::sort(sortedPrev.begin(), sortedPrev.end());
     for (const auto& candidate : candidates) {
         bool isValid = true;
         // Generate all (k-1)-size subsets
@@ -279,7 +268,7 @@ std::vector<Colocation> JoinlessMiner::filterCandidates(
             // If we removed an element at index i != 0, the subset still keeps candidate[0] (f_min).
             if (i != 0) {
                 // Lemma 2: If a subset containing f_min is NOT prevalent, C is not prevalent 
-                if (prevSet.find(subset) == prevSet.end()) {
+                if (!std::binary_search(sortedPrev.begin(), sortedPrev.end(), subset)) {
                     isValid = false;
                     break; // Prune immediately
                 }
@@ -338,7 +327,7 @@ std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
         if (featureNode->type == FEATURE_NODE && featureNode->featureType == instance->type) {
             // Find the instance node for this specific instance (Level 2)
             for (const auto* instanceNode : featureNode->children) {
-                if (instanceNode->type == INSTANCE_NODE && instanceNode->data == instance) {
+                if (instanceNode->type == INSTANCE_NODE && instanceNode->data->id == instance->id) {
                     // Find the neighbor feature node for the target feature type (Level 3)
                     for (const auto* neighborFeatureNode : instanceNode->children) {
                         if (neighborFeatureNode->type == FEATURE_NODE && 
@@ -374,23 +363,34 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
 
     // Start with neighbors of the first instance
     std::vector<const SpatialInstance*> intersection = findNeighbors(tree, instance[0], featureType);
-    
+
     // Intersect with neighbors of remaining instances
     for (size_t i = 1; i < instance.size(); i++) {
         std::vector<const SpatialInstance*> neighbors = findNeighbors(tree, instance[i], featureType);
-        
-        // Calculate intersection: keep only instances that are in both sets
-        std::unordered_set<const SpatialInstance*> lookupTable(neighbors.begin(), neighbors.end());
+
+        if (neighbors.empty()) {
+            return {}; // Một ông không có neighbor thì giao bằng rỗng luôn
+        }
+
+        // --- [SỬA TẠI ĐÂY] ---
+        // Dùng ID để tạo bảng tra cứu (Lookup Table)
+        // Giả sử ID là int hoặc string đều dùng được cách này
+        std::set<decltype(instance[0]->id)> neighborIDs;
+        for (const auto* ptr : neighbors) {
+            neighborIDs.insert(ptr->id);
+        }
+
         std::vector<const SpatialInstance*> newIntersection;
-        newIntersection.reserve(intersection.size());
+
+        // Chỉ giữ lại những thằng trong intersection có ID nằm trong neighborIDs
         for (const auto* ptr : intersection) {
-            if (lookupTable.count(ptr)) {
+            if (neighborIDs.count(ptr->id)) {
                 newIntersection.push_back(ptr);
             }
         }
-        
+
         intersection = std::move(newIntersection);
-        
+
         // Early termination if intersection becomes empty
         if (intersection.empty()) {
             break;
@@ -400,8 +400,16 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
     return intersection;
 }
 
-//// Main function to generate table instances for candidate patterns (Step 10)
-//// Uses Definition 8 and Lemma 4 to extend (k-1)-size instances to k-size instances
+
+// Hàm helper để in pattern (VD: {A, B})
+void printDebugPattern(const Colocation& col) {
+    std::cout << "{";
+    for (size_t i = 0; i < col.size(); ++i) {
+        std::cout << col[i] << (i < col.size() - 1 ? ", " : "");
+    }
+    std::cout << "}";
+}
+
 std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableInstance(
     const std::vector<Colocation>& candidates,
     const std::map<Colocation, std::vector<ColocationInstance>>& prevTableInstances,
@@ -411,32 +419,54 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
 
     // Iterate through each candidate pattern C of size k
     for (const auto& candidate : candidates) {
-        if (candidate.empty()) continue;
+
+        // --- [DEBUG 1] Kiểm tra candidate rỗng ---
+        if (candidate.empty()) {
+            std::cout << "[DEBUG] SKIP: Candidate is empty.\n";
+            continue;
+        }
 
         // 1. Split candidate into prefix (k-1 features) and the new feature
-        // Assumes candidate features are sorted, so prefix is the first k-1 elements
         Colocation subPattern(candidate.begin(), candidate.end() - 1);
         FeatureType newFeature = candidate.back();
 
         // 2. Fast lookup: Find existing instances of the prefix pattern
         auto it = prevTableInstances.find(subPattern);
+
+        // --- [DEBUG 2] Kiểm tra Prefix (quan trọng nhất cho lỗi size 2) ---
         if (it == prevTableInstances.end()) {
-            continue; // No instances to extend
+            std::cout << "[DEBUG] SKIP Candidate ";
+            printDebugPattern(candidate);
+            std::cout << ". Reason: Prefix ";
+            printDebugPattern(subPattern);
+            std::cout << " NOT FOUND in prevTableInstances.\n";
+
+            // Gợi ý lỗi cụ thể nếu đang chạy k=2
+            if (candidate.size() == 2) {
+                std::cout << "    -> HINT: For k=2, prevTableInstances must contain size-1 patterns (e.g., {'A'}). Did you initialize T1 correctly?\n";
+            }
+            continue;
         }
 
         std::vector<ColocationInstance> newTableRows;
-        // Access the vector of instances directly (Value of the Map)
         const std::vector<ColocationInstance>& prevInstancesList = it->second;
+
+        // --- [DEBUG 3] Prefix tồn tại nhưng không có instance nào ---
+        if (prevInstancesList.empty()) {
+            std::cout << "[DEBUG] SKIP Candidate ";
+            printDebugPattern(candidate);
+            std::cout << ". Reason: Prefix found but has 0 instances.\n";
+            continue;
+        }
 
         // 3. Try to extend each existing instance I with the new feature f
         for (const auto& prevInstance : prevInstancesList) {
-
-            // Calculate intersection of neighbors using NRTree: S(I, f)
+            // Calculate intersection
             std::vector<const SpatialInstance*> extendedSet = findExtendedSet(
                 orderedNRTree, prevInstance, newFeature
             );
 
-            // 4. Create new instances I' = I + {o}
+            // 4. Create new instances
             for (const auto* neighbor : extendedSet) {
                 ColocationInstance newRow = prevInstance;
                 newRow.push_back(neighbor);
@@ -444,9 +474,16 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
             }
         }
 
-        // Store results if any instances were found
+        // Store results
         if (!newTableRows.empty()) {
             result[candidate] = std::move(newTableRows);
+        }
+        else {
+            // --- [DEBUG 4] Xử lý xong nhưng không tạo được instance nào (do không thỏa mãn khoảng cách) ---
+            // Đây thường không phải lỗi code, mà do dữ liệu không có co-location ở vị trí này
+            std::cout << "[INFO] Candidate ";
+            printDebugPattern(candidate);
+            std::cout << " processed but NO instances generated (No neighbors satisfy distance).\n";
         }
     }
 
@@ -462,21 +499,43 @@ std::vector<Colocation> JoinlessMiner::selectPrevColocations(
     double delta
 ) {
     std::vector<Colocation> prevalentPatterns;
-    // Iterate through all candidate patterns generated in this step
+
     for (const auto& candidate : candidates) {
-		double wpi = 1.1;
-		for (const FeatureType& feature : candidate) {
-			double pr = calculatePR(feature, candidate, tableInstances, featureCount);
-			double ri = calculateRareIntensity(feature, candidate, featureCount, delta);
-			double w = 1.0 / ri;
-			double wpr = pr * w;
-            if (wpr < wpi) {
+        // Init WPI with a safe max value
+        double wpi = 1.0;
+        bool first = true;
+
+        for (const FeatureType& feature : candidate) {
+            double pr = calculatePR(feature, candidate, tableInstances, featureCount);
+            double ri = calculateRareIntensity(feature, candidate, featureCount, delta);
+
+            // Safety check for RI
+            double w = 0.0;
+            if (ri > Constants::EPSILON_SMALL) { // Epsilon check
+                w = 1.0 / ri;
+            }
+            else {
+                // If RI is 0 (should imply feature not in pattern or error), weight is huge or handled
+                w = 0.0;
+            }
+
+            double wpr = pr * w;
+
+            if (first) {
                 wpi = wpr;
+                first = false;
+            }
+            else {
+                if (wpr < wpi) {
+                    wpi = wpr;
+                }
             }
         }
+
+        // Check threshold
         if (wpi >= minPrev) {
             prevalentPatterns.push_back(candidate);
-		}
+        }
     }
 
     return prevalentPatterns;
