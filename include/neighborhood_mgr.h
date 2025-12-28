@@ -34,11 +34,11 @@ public:
 
 private:
     /**
-     * @brief Lưu trữ Neigh: Map từ FeatureType -> Danh sách các OrderedNeigh
+     * @brief Store Neigh: Map from FeatureType to list of OrderedNeigh
      */
     std::unordered_map<FeatureType, std::vector<OrderedNeigh>> orderedNeighborMap;
 
-    // Hàm kiểm tra thứ tự
+    // Function to check ordering
     bool isOrdered(const FeatureType& centerType,
         const FeatureType& neighborType,
         const std::map<FeatureType, int>& counts);

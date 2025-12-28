@@ -4,14 +4,14 @@
 #include <iostream>
 #include <algorithm>
 #include <map>
-#include "neighborhood_mgr.h" // Để dùng struct OrderedNeigh và FeatureType
+#include "neighborhood_mgr.h" // To use struct OrderedNeigh and FeatureType
 #include "types.h"
 
-// --- [QUAN TRỌNG] THÊM DÒNG NÀY ---
+// --- [IMPORTANT] FORWARD DECLARATION ---
 class NeighborhoodMgr;
 // ---------------------------------
 
-// Loại node trong cây để dễ quản lý
+// Node type in tree for easy management
 enum NodeType {
     ROOT_NODE,
     FEATURE_NODE,
@@ -20,16 +20,16 @@ enum NodeType {
     NEIGHBOR_NODE
 };
 
-// Cấu trúc một nút trong cây NR-Tree
+// Structure of a node in the NR-Tree
 struct NRNode {
     NodeType type;
 
-    // Dữ liệu tùy thuộc vào loại node
-    FeatureType featureType;        // Dùng nếu là FEATURE_NODE
-    const SpatialInstance* data;    // Dùng nếu là INSTANCE_NODE hoặc NEIGHBOR_NODE
-    std::vector<const SpatialInstance*> instanceVector;  // Dùng nếu là INSTANCE_VECTOR_NODE
+    // Data depends on node type
+    FeatureType featureType;        // Used if FEATURE_NODE
+    const SpatialInstance* data;    // Used if INSTANCE_NODE or NEIGHBOR_NODE
+    std::vector<const SpatialInstance*> instanceVector;  // Used if INSTANCE_VECTOR_NODE
 
-    // Danh sách con
+    // List of children
     std::vector<NRNode*> children;
 
     // Constructor helper
@@ -45,20 +45,20 @@ class NRTree {
 private:
     NRNode* root;
 
-    // Hàm đệ quy để in cây (cho mục đích debug)
+    // Recursive function to print tree (for debugging purposes)
     void printRecursive(NRNode* node, int level) const;
 
 public:
     inline NRTree();
     ~NRTree();
 
-    // Hàm quan trọng nhất: Xây dựng cây từ kết quả của NeighborhoodMgr
-    // Theo paper: features phải được sắp xếp theo số lượng instance (ascending)
+    // Most important function: Build tree from NeighborhoodMgr results
+    // According to paper: features must be sorted by instance count (ascending)
     void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts);
 
-    // Hàm in cây ra màn hình để kiểm tra
+    // Function to print tree to screen for verification
     void printTree() const;
 
-    // Getter root nếu cần xử lý bên ngoài
+    // Getter for root if external processing needed
     const NRNode* getRoot() const { return root; }
 };

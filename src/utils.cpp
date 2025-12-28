@@ -4,14 +4,13 @@
  */
 
 #include "utils.h"
+#include "constants.h"
 #include <set>
 #include <chrono>
 #include <windows.h>
 #include <psapi.h>
 #include <iostream> 
 #include <iomanip>
-#include <windows.h>
-#include <psapi.h>
 #include <algorithm> 
 #include <cmath>    
 
@@ -125,7 +124,7 @@ double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std:
             double denominator = counts[i];
             
             // Handle division by zero
-            if (denominator == 0) denominator = 1e-6; 
+            if (denominator == 0) denominator = Constants::EPSILON_SMALL; 
             
             double ratio = numerator / denominator;
             sumRatios += ratio;
@@ -192,7 +191,7 @@ double calculateRareIntensity(
     double delta) 
 {
     // Safety check for delta to avoid division by zero
-    if (delta <= 1e-9) return 0.0;
+    if (delta <= Constants::EPSILON_DELTA) return 0.0;
 
     // Definition check: RI(fi, C) is only defined if fi is in C
     if (std::find(pattern.begin(), pattern.end(), rareType) == pattern.end()) {
