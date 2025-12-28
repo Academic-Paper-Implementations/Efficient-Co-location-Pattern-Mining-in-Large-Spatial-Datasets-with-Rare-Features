@@ -1,4 +1,5 @@
 ﻿#include "NRTree.h"
+#include "utils.h"
 
 NRTree::NRTree() {
     root = new NRNode(ROOT_NODE);
@@ -11,7 +12,7 @@ NRTree::~NRTree() {
     }
 }
 
-void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts) {
+void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances) {
     // 0. Reset tree if old data exists
     if (root) delete root;
     root = new NRNode(ROOT_NODE);
@@ -26,14 +27,8 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
     for (const auto& pair : rawMap) {
         sortedFeatures.push_back(pair.first);
     }
-    // Sort features by instance count (ascending), then lexicographic
-    std::sort(sortedFeatures.begin(), sortedFeatures.end(),
-        [&featureCounts](const FeatureType& a, const FeatureType& b) {
-            int countA = featureCounts.count(a) ? featureCounts.at(a) : 0;
-            int countB = featureCounts.count(b) ? featureCounts.at(b) : 0;
-            if (countA != countB) return countA < countB;
-            return a < b; // Lexicographic tie-breaker
-        });
+	//Sort features by feature count (ascending)
+	sortedFeatures = featureSort(sortedFeatures, instances);
 
     for (const auto& fType : sortedFeatures) {
         // Create feature node (e.g., Node A)
@@ -45,17 +40,7 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
         const auto& starList = rawMap.at(fType);
 
         // 2. LEVEL 2: INSTANCE NODES (Center)
-        // Sort instance centers by ID for consistent ordering
-        std::vector<OrderedNeigh> sortedStarList = starList;
-        std::sort(sortedStarList.begin(), sortedStarList.end(),
-            [](const OrderedNeigh& a, const OrderedNeigh& b) {
-                return a.center->id < b.center->id;
-            });
-		/////////////////////////////////////////////////////////
-        // TODO: edit sort by other way, this way is wrong.
-		/////////////////////////////////////////////////////////
-
-        for (const auto& star : sortedStarList) {
+        for (const auto& star : starList) {
             NRNode* centerNode = new NRNode(INSTANCE_NODE);
             centerNode->data = star.center; // Store pointer to original data
             fNode->children.push_back(centerNode);
@@ -69,18 +54,8 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
             for (const auto& mapEntry : star.neighbors) {
                 neighborFeatureTypes.push_back(mapEntry.first);
             }
-
-            // Sort neighbor feature types by feature count (ascending), then lexicographic
-            std::sort(neighborFeatureTypes.begin(), neighborFeatureTypes.end(),
-                [&featureCounts](const FeatureType& a, const FeatureType& b) {
-                    int countA = featureCounts.count(a) ? featureCounts.at(a) : 0;
-                    int countB = featureCounts.count(b) ? featureCounts.at(b) : 0;
-                    if (countA != countB) return countA < countB;
-                    return a < b; // Lexicographic tie-breaker
-                });
-            /////////////////////////////////////////////////////////
-            // TODO: change this sort function to utils.h.
-            /////////////////////////////////////////////////////////
+			// Sort neighbor feature types by feature count (ascending)
+			neighborFeatureTypes = featureSort(neighborFeatureTypes, instances);
 
             // Create FEATURE_NODE for each neighbor feature type
             for (const auto& neighborFeatureType : neighborFeatureTypes) {
@@ -91,21 +66,10 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
                 // 4. LEVEL 4: INSTANCE_VECTOR_NODE (single node containing vector of neighbor instances)
                 // Get list of instances for this feature type and sort by ID (alphabetical)
                 const auto& neighborInstances = star.neighbors.at(neighborFeatureType);
-                std::vector<const SpatialInstance*> sortedNeighborInstances = neighborInstances;
-
-                // Sort by ID (alphabetical order)
-                std::sort(sortedNeighborInstances.begin(), sortedNeighborInstances.end(),
-                [](const SpatialInstance* a, const SpatialInstance* b) {
-                    if (a->type != b->type) return a->type < b->type;
-                    return a->id < b->id;
-                });
-                /////////////////////////////////////////////////////////
-                // TODO: edit sort by other way, this way is wrong.
-                /////////////////////////////////////////////////////////
 
                 // Create single INSTANCE_VECTOR_NODE to store vector of neighbor instances
                 NRNode* instanceVectorNode = new NRNode(INSTANCE_VECTOR_NODE);
-                instanceVectorNode->instanceVector = sortedNeighborInstances;  // Store entire vector
+                instanceVectorNode->instanceVector = neighborInstances;  // Store entire vector
                 neighborFeatureNode->children.push_back(instanceVectorNode);
             }
         }

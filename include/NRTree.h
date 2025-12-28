@@ -6,6 +6,7 @@
 #include <map>
 #include "neighborhood_mgr.h" // To use struct OrderedNeigh and FeatureType
 #include "types.h"
+#include "utils.h"
 
 // --- [IMPORTANT] FORWARD DECLARATION ---
 class NeighborhoodMgr;
@@ -53,7 +54,7 @@ public:
 
     // Most important function: Build tree from NeighborhoodMgr results
     // According to paper: features must be sorted by instance count (ascending)
-    void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts);
+    void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances);
 
     // Function to print tree to screen for verification
     void printTree() const;

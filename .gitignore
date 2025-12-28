@@ -30,3 +30,4 @@ spatial_index
 /mining_report.txt
 /src/test.cpp
 out/
+/src/test_mgr.cpp

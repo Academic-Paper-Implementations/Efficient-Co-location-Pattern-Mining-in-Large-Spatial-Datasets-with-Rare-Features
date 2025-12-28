@@ -19,6 +19,7 @@
 #include <omp.h> 
 #include <iomanip>
 #include <chrono>
+#include <unordered_set>
 
 std::vector<Colocation> JoinlessMiner::mineColocations(
     double minPrev,
@@ -46,6 +47,13 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     std::vector<Colocation> prevColocations;
     // T1 = O (Table instance of size-1)
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
+    // Khởi tạo T1 (Table Instance k=1)
+    // Map: {Key: [FeatureType], Value: List of rows}
+    for (const auto& instance : instances) {
+        Colocation key = { instance.type };
+        ColocationInstance row = { &instance };
+        prevTableInstances[key].push_back(row);
+    }
     std::vector<Colocation> allPrevalentColocations;
 
     // Estimate total iterations (max pattern size is number of types)
@@ -361,7 +369,7 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
     const FeatureType& featureType
 ) {
     if (instance.empty()) {
-        return std::vector<const SpatialInstance*>();
+        return {};
     }
 
     // Start with neighbors of the first instance
@@ -372,12 +380,12 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
         std::vector<const SpatialInstance*> neighbors = findNeighbors(tree, instance[i], featureType);
         
         // Calculate intersection: keep only instances that are in both sets
+        std::unordered_set<const SpatialInstance*> lookupTable(neighbors.begin(), neighbors.end());
         std::vector<const SpatialInstance*> newIntersection;
-        std::set<const SpatialInstance*> neighborSet(neighbors.begin(), neighbors.end());
-        
-        for (const auto* inst : intersection) {
-            if (neighborSet.find(inst) != neighborSet.end()) {
-                newIntersection.push_back(inst);
+        newIntersection.reserve(intersection.size());
+        for (const auto* ptr : intersection) {
+            if (lookupTable.count(ptr)) {
+                newIntersection.push_back(ptr);
             }
         }
         
@@ -394,127 +402,6 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
 
 //// Main function to generate table instances for candidate patterns (Step 10)
 //// Uses Definition 8 and Lemma 4 to extend (k-1)-size instances to k-size instances
-//std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableInstance(
-//    const std::vector<Colocation>& candidates,
-//    const std::map<Colocation, std::vector<ColocationInstance>>& prevTableInstances,
-//    const NRTree& orderedNRTree
-//) {
-//    std::map<Colocation, std::vector<ColocationInstance>> result;
-//
-//    // For each candidate pattern C of size k
-//    for (const auto& candidate : candidates) {
-//        std::vector<ColocationInstance> tableInstances;
-//
-//        // For each table instance I of size k-1
-//        for (const auto& prevInstance : prevTableInstances) {
-//            // Check if prevInstance can be extended to form an instance of candidate
-//            // According to the algorithm, candidates are generated from (k-1)-size patterns
-//            // using Apriori-gen, so prevInstance should match a (k-1)-size subset of candidate
-//            
-//            // Check if prevInstance size matches (k-1)
-//            if (prevInstance.size() != candidate.size() - 1) {
-//                continue;
-//            }
-//
-//            // Build set of features in prevInstance
-//            std::set<FeatureType> prevInstanceFeatures;
-//            for (const auto* inst : prevInstance) {
-//                prevInstanceFeatures.insert(inst->type);
-//            }
-//
-//            // Build set of features in candidate
-//            std::set<FeatureType> candidateFeatures(candidate.begin(), candidate.end());
-//
-//            // Check if prevInstance is a subset of candidate (exactly k-1 features match)
-//            if (prevInstanceFeatures.size() != candidateFeatures.size() - 1) {
-//                continue;
-//            }
-//
-//            // Find the new feature f (the one in candidate but not in prevInstance)
-//            FeatureType newFeature = "";
-//            bool isSubset = true;
-//            
-//            for (const auto& feature : candidateFeatures) {
-//                if (prevInstanceFeatures.find(feature) == prevInstanceFeatures.end()) {
-//                    if (newFeature.empty()) {
-//                        newFeature = feature;
-//                    } else {
-//                        // More than one feature missing - prevInstance doesn't match
-//                        isSubset = false;
-//                        break;
-//                    }
-//                }
-//            }
-//
-//            // Verify that all features in prevInstance are in candidate
-//            for (const auto& feature : prevInstanceFeatures) {
-//                if (candidateFeatures.find(feature) == candidateFeatures.end()) {
-//                    isSubset = false;
-//                    break;
-//                }
-//            }
-//
-//            if (!isSubset || newFeature.empty()) {
-//                continue;
-//            }
-//
-//            // Now we need to reorder prevInstance to match the order in candidate
-//            // Create a mapping from feature to instance in prevInstance
-//            std::map<FeatureType, const SpatialInstance*> featureToInstance;
-//            for (const auto* inst : prevInstance) {
-//                featureToInstance[inst->type] = inst;
-//            }
-//
-//            // Build ordered instance matching candidate order (excluding newFeature)
-//            ColocationInstance orderedPrevInstance;
-//            for (const auto& feature : candidate) {
-//                if (feature != newFeature) {
-//                    auto it = featureToInstance.find(feature);
-//                    if (it != featureToInstance.end()) {
-//                        orderedPrevInstance.push_back(it->second);
-//                    } else {
-//                        // This shouldn't happen if isSubset is true, but check anyway
-//                        isSubset = false;
-//                        break;
-//                    }
-//                }
-//            }
-//
-//            if (!isSubset || orderedPrevInstance.size() != candidate.size() - 1) {
-//                continue;
-//            }
-//
-//            // Calculate S(I, f) = Neigh(o1, f) ∩ ··· ∩ Neigh(ok, f) (Definition 8)
-//            std::vector<const SpatialInstance*> extendedSet = findExtendedSet(
-//                orderedNRTree, orderedPrevInstance, newFeature
-//            );
-//
-//            // According to Lemma 4: if S(I, f) ≠ Ø, append any instance o from S(I, f) to I
-//            // to form a row instance I' = {o1, ..., ok, o} of co-location C' = {f1, ..., fk, f}
-//            for (const auto* newInstance : extendedSet) {
-//                // Verify that the new instance has the correct feature type
-//                if (newInstance->type != newFeature) {
-//                    continue;
-//                }
-//
-//                // Create new row instance I' = orderedPrevInstance ∪ {o}
-//                // The order should match candidate: [f1-instance, ..., fk-instance]
-//                ColocationInstance newRowInstance = orderedPrevInstance;
-//                newRowInstance.push_back(newInstance);
-//                tableInstances.push_back(newRowInstance);
-//            }
-//        }
-//
-//        // Store table instances for this candidate pattern
-//        if (!tableInstances.empty()) {
-//            result[candidate] = tableInstances;
-//        }
-//    }
-//
-//    return result;
-//}
-
-
 std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableInstance(
     const std::vector<Colocation>& candidates,
     const std::map<Colocation, std::vector<ColocationInstance>>& prevTableInstances,
@@ -551,18 +438,15 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
 
             // 4. Create new instances I' = I + {o}
             for (const auto* neighbor : extendedSet) {
-                // strict type check
-                if (neighbor->type == newFeature) {
-                    ColocationInstance newRow = prevInstance;
-                    newRow.push_back(neighbor);
-                    newTableRows.push_back(newRow);
-                }
+                ColocationInstance newRow = prevInstance;
+                newRow.push_back(neighbor);
+                newTableRows.push_back(std::move(newRow));
             }
         }
 
         // Store results if any instances were found
         if (!newTableRows.empty()) {
-            result[candidate] = newTableRows;
+            result[candidate] = std::move(newTableRows);
         }
     }
 
