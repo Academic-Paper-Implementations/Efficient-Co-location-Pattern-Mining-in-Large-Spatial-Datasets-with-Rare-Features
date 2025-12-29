@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     neighbor_mgr.buildFromPairs(neighborPairs, featureCount);
 
     NRTree orderedNRTree;
-    orderedNRTree.build(neighbor_mgr, featureCount);
+    orderedNRTree.build(neighbor_mgr, featureCount,instances);
 
     const auto materializationEndTime = std::chrono::high_resolution_clock::now();
     const double mat_time = std::chrono::duration<double, std::milli>(materializationEndTime - materializationStartTime).count();
