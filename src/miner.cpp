@@ -36,7 +36,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     const std::vector<FeatureType> sortedTypes = featureSort(allFeatureTypes, instances);
     const double delta = calculateDelta(sortedTypes, featureCount);
 
-    // DEBUG: In ra thứ tự Feature sau khi sort (Rất quan trọng)
+    // DEBUG: Print feature sort order (critical for algorithm correctness)
     std::cout << "\n[DEBUG INIT] Feature Sort Order (Rare -> Frequent):\n";
     for (const auto& featureType : sortedTypes) {
         std::cout << "   " << featureType << ": " << featureCount.at(featureType) << " instances\n";
@@ -46,8 +46,8 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     std::vector<Colocation> prevColocations;
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
 
-    // Khởi tạo T1 (Table Instance k=1)
-    // Map: {Key: [FeatureType], Value: List of rows}
+    // Initialize T1 (Table Instance for k=1)
+    // Map structure: {Key: [FeatureType], Value: List of instance rows}
     for (const auto& instance : instances) {
         Colocation key = { instance.type };
         ColocationInstance row = { &instance };
@@ -56,7 +56,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
     std::vector<Colocation> allPrevalentColocations;
 
-    // Khởi tạo P1 (Prevalent k=1)
+    // Initialize P1 (Prevalent patterns for k=1)
     prevColocations.reserve(sortedTypes.size());
     for (const auto& featureType : sortedTypes) {
         prevColocations.push_back({ featureType });

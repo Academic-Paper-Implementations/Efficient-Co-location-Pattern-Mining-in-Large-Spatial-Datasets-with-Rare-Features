@@ -58,21 +58,23 @@ std::vector<std::pair<SpatialInstance, SpatialInstance>> SpatialIndex::findNeigh
     const double maxY = std::max_element(instances.begin(), instances.end(),
         [](const SpatialInstance& a, const SpatialInstance& b) { return a.y < b.y; })->y;
 
+
     // Create grid cells based on distance threshold
-    const int gridCellsX = static_cast<int>(std::ceil((maxX - minX) / distanceThreshold));
-    const int gridCellsY = static_cast<int>(std::ceil((maxY - minY) / distanceThreshold));
-    std::vector<std::vector<SpatialInstance>> gridCells(gridCellsX * gridCellsY);
+    const size_t gridCellsX = static_cast<size_t>(std::ceil((maxX - minX) / distanceThreshold));
+    const size_t gridCellsY = static_cast<size_t>(std::ceil((maxY - minY) / distanceThreshold));
+    const size_t totalCells = gridCellsX * gridCellsY;
+    std::vector<std::vector<SpatialInstance>> gridCells(totalCells);
 
     // Assign instances to grid cells
     for (const auto& inst : instances) {
-        const int cellX = static_cast<int>((inst.x - minX) / distanceThreshold);
-        const int cellY = static_cast<int>((inst.y - minY) / distanceThreshold);
+        const size_t cellX = static_cast<size_t>((inst.x - minX) / distanceThreshold);
+        const size_t cellY = static_cast<size_t>((inst.y - minY) / distanceThreshold);
         gridCells[cellX * gridCellsY + cellY].push_back(inst);
     }
 
     // Check pairs within and between adjacent cells
-    for (int cellX = 0; cellX < gridCellsX; ++cellX) {
-        for (int cellY = 0; cellY < gridCellsY; ++cellY) {
+    for (size_t cellX = 0; cellX < gridCellsX; ++cellX) {
+        for (size_t cellY = 0; cellY < gridCellsY; ++cellY) {
             const auto& cell = gridCells[cellX * gridCellsY + cellY];
 
             // Check pairs within the same cell
@@ -90,10 +92,11 @@ std::vector<std::pair<SpatialInstance, SpatialInstance>> SpatialIndex::findNeigh
                             continue;
                         }
                         
-                        const int neighborCellX = cellX + deltaX;
-                        const int neighborCellY = cellY + deltaY;
+                        const size_t neighborCellX = cellX + deltaX;
+                        const size_t neighborCellY = cellY + deltaY;
                         
-                        if (neighborCellX >= 0 && neighborCellX < gridCellsX && neighborCellY >= 0 && neighborCellY < gridCellsY) {
+                        // Bounds check: ensure neighbor cell is within grid
+                        if (neighborCellX < gridCellsX && neighborCellY < gridCellsY) {
                             const auto& neighborCell = gridCells[neighborCellX * gridCellsY + neighborCellY];
                             for (const auto& neighborInst : neighborCell) {
                                 if (cell[i].type != neighborInst.type && euclideanDist(cell[i], neighborInst) <= distanceThreshold) {

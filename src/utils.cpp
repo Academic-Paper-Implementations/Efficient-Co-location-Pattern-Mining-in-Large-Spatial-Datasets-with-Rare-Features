@@ -19,9 +19,10 @@ std::vector<FeatureType> getAllObjectTypes(const std::vector<SpatialInstance>& i
     // Use a set to automatically handle uniqueness
     std::set<FeatureType> objectTypesSet;
     
-    for (const auto& instance : instances) {
-        objectTypesSet.insert(instance.type);
-    }
+    // Use std::transform to extract types
+    std::transform(instances.begin(), instances.end(),
+                   std::inserter(objectTypesSet, objectTypesSet.end()),
+                   [](const SpatialInstance& instance) { return instance.type; });
     
     // Convert set to vector (set maintains sorted order)
     return std::vector<FeatureType>(objectTypesSet.begin(), objectTypesSet.end());
@@ -44,19 +45,19 @@ std::map<FeatureType, int> countInstancesByFeature(const std::vector<SpatialInst
 
 
 
+
 std::optional<SpatialInstance> getInstanceByID(
     const std::vector<SpatialInstance>& instances, 
     const instanceID& id) 
 {
-    // Linear search for instance with matching ID
-    for (const auto& instance : instances) {
-        if (instance.id == id) {
-            return instance;
-        }
-    }
+    // Use std::find_if for search
+    const auto it = std::find_if(instances.begin(), instances.end(),
+                                  [&id](const SpatialInstance& instance) {
+                                      return instance.id == id;
+                                  });
     
-    // Return nullopt if not found
-    return std::nullopt;
+    // Return instance if found, nullopt otherwise
+    return (it != instances.end()) ? std::optional<SpatialInstance>(*it) : std::nullopt;
 }
 
 // Step 2: Sorting features in ascending order of the quantity of instances
@@ -112,12 +113,12 @@ double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std:
     // Paper: delta = 2/(m(m-1)) * Sum_{i<j} (|fj| / |fi|)
     // The indices i, j correspond to the sorted feature list order.
 
-    double numFeatures = static_cast<double>(counts.size());
+    const double numFeatures = static_cast<double>(counts.size());
     double sumRatios = 0.0;
 
     // 3. Calculate sum of ratios for all pairs i < j
-    for (int i = 0; i < numFeatures; ++i) {
-        for (int j = i + 1; j < numFeatures; ++j) {
+    for (size_t i = 0; i < counts.size(); ++i) {
+        for (size_t j = i + 1; j < counts.size(); ++j) {
             // Formula uses |fj| / |fi| where i < j
             // Since features are sorted by count ascending, |fi| <= |fj| usually holds,
             // making the ratio >= 1 (or close to it/handling stability).
@@ -298,7 +299,7 @@ void findCombinations(
 
 void printDuration(const std::string& stepName, std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end) {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::cout << "[PERF] " << stepName << ": " << duration << " ms" << std::endl;
+    std::cout << "[PERF] " << stepName << ": " << duration << " ms\n";
 }
 
 

@@ -17,9 +17,11 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
     // Same logic as in isOrdered() and featureSort()
     std::vector<FeatureType> sortedFeatures;
     sortedFeatures.reserve(rawMap.size());
-    for (const auto& pair : rawMap) {
-        sortedFeatures.push_back(pair.first);
-    }
+
+    // Use std::transform to extract keys
+    std::transform(rawMap.begin(), rawMap.end(),
+        std::back_inserter(sortedFeatures),
+        [](const auto& pair) { return pair.first; });
     // Sort features by instance count (ascending), then lexicographic
     std::sort(sortedFeatures.begin(), sortedFeatures.end(),
         [&featureCounts](const FeatureType& a, const FeatureType& b) {
@@ -30,10 +32,9 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
         });
 
     for (const auto& featureType : sortedFeatures) {
-        // Create feature node (e.g., Node A)
-        NRNode* featureNode = new NRNode(FEATURE_NODE);
+        // Create feature node (e.g., Node A) - exception safe with unique_ptr
+        auto featureNode = std::make_unique<NRNode>(FEATURE_NODE);
         featureNode->featureType = featureType;
-        root->children.push_back(featureNode);
 
         // Get list of center instances for this feature
         const auto& starList = rawMap.at(featureType);
@@ -45,14 +46,12 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
             [](const OrderedNeigh& a, const OrderedNeigh& b) {
                 return a.center->id < b.center->id;
             });
-		/////////////////////////////////////////////////////////
-        // TODO: edit sort by other way, this way is wrong.
-		/////////////////////////////////////////////////////////
+        // TODO: Verify sorting criteria matches paper specification
 
         for (const auto& star : sortedStarList) {
-            NRNode* centerNode = new NRNode(INSTANCE_NODE);
+            // Exception safe allocation
+            auto centerNode = std::make_unique<NRNode>(INSTANCE_NODE);
             centerNode->instancePtr = star.center; // Store pointer to original data
-            featureNode->children.push_back(centerNode);
 
             // 3. LEVEL 3: FEATURE NODES (for neighbor features)
             // Neighbor data is in: star.neighbors (unordered_map<FeatureType, vector<const SpatialInstance*>>)
@@ -61,9 +60,11 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
             // Get list of neighbor feature types and sort by feature count
             std::vector<FeatureType> neighborFeatureTypes;
             neighborFeatureTypes.reserve(star.neighbors.size());
-            for (const auto& mapEntry : star.neighbors) {
-                neighborFeatureTypes.push_back(mapEntry.first);
-            }
+
+            // Use std::transform to extract keys
+            std::transform(star.neighbors.begin(), star.neighbors.end(),
+                std::back_inserter(neighborFeatureTypes),
+                [](const auto& mapEntry) { return mapEntry.first; });
 
             // Sort neighbor feature types by feature count (ascending), then lexicographic
             std::sort(neighborFeatureTypes.begin(), neighborFeatureTypes.end(),
@@ -73,15 +74,13 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
                     if (countA != countB) return countA < countB;
                     return a < b; // Lexicographic tie-breaker
                 });
-            /////////////////////////////////////////////////////////
-            // TODO: change this sort function to utils.h.
-            /////////////////////////////////////////////////////////
+            // TODO: Extract sort function to utils.h for reusability
 
             // Create FEATURE_NODE for each neighbor feature type
             for (const auto& neighborFeatureType : neighborFeatureTypes) {
-                NRNode* neighborFeatureNode = new NRNode(FEATURE_NODE);
+                // Exception safe allocation
+                auto neighborFeatureNode = std::make_unique<NRNode>(FEATURE_NODE);
                 neighborFeatureNode->featureType = neighborFeatureType;
-                centerNode->children.push_back(neighborFeatureNode);
 
                 // 4. LEVEL 4: INSTANCE_VECTOR_NODE (single node containing vector of neighbor instances)
                 // Get list of instances for this feature type and sort by ID (alphabetical)
@@ -90,20 +89,30 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
 
                 // Sort by ID (alphabetical order)
                 std::sort(sortedNeighborInstances.begin(), sortedNeighborInstances.end(),
-                [](const SpatialInstance* a, const SpatialInstance* b) {
-                    if (a->type != b->type) return a->type < b->type;
-                    return a->id < b->id;
-                });
-                /////////////////////////////////////////////////////////
-                // TODO: edit sort by other way, this way is wrong.
-                /////////////////////////////////////////////////////////
+                    [](const SpatialInstance* a, const SpatialInstance* b) {
+                        if (a->type != b->type) return a->type < b->type;
+                        return a->id < b->id;
+                    });
+                // TODO: Verify sorting criteria matches paper specification
 
                 // Create single INSTANCE_VECTOR_NODE to store vector of neighbor instances
-                NRNode* instanceVectorNode = new NRNode(INSTANCE_VECTOR_NODE);
+                // Exception safe allocation
+                auto instanceVectorNode = std::make_unique<NRNode>(INSTANCE_VECTOR_NODE);
                 instanceVectorNode->instanceVector = sortedNeighborInstances;  // Store entire vector
-                neighborFeatureNode->children.push_back(instanceVectorNode);
+
+                // Transfer ownership - only release when successfully added
+                neighborFeatureNode->children.push_back(instanceVectorNode.release());
+
+                // Add neighbor feature node to center node after building its children
+                centerNode->children.push_back(neighborFeatureNode.release());
             }
+
+            // Add center node to feature node after building its children
+            featureNode->children.push_back(centerNode.release());
         }
+
+        // Add feature node to root after building its children
+        root->children.push_back(featureNode.release());
     }
 }
 
