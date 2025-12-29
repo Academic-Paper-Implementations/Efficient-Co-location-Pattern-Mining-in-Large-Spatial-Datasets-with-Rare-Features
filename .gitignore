@@ -31,3 +31,4 @@ spatial_index
 /src/test.cpp
 out/
 /src/test_mgr.cpp
+/data/plant_big_100_ex_checkin.csv

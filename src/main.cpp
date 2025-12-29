@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     // Step 1: Load Configuration
     // ========================================================================
     printSectionHeader("STEP 1: CONFIGURATION");
-    std::string config_path = (argc > 1) ? argv[1] : "config.txt";
+    std::string config_path = (argc > 1) ? argv[1] : "./config/config.txt";
     AppConfig config = ConfigLoader::load(config_path);
 
     std::cout << std::left << std::setw(25) << "Dataset Path:" << config.datasetPath << "\n";
@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     neighbor_mgr.buildFromPairs(neighborPairs, featureCount);
 
     NRTree orderedNRTree;
-    orderedNRTree.build(neighbor_mgr, featureCount);
+    orderedNRTree.build(neighbor_mgr, featureCount,instances);
 
     auto t_mat_end = std::chrono::high_resolution_clock::now();
     double mat_time = std::chrono::duration<double, std::milli>(t_mat_end - t_mat_start).count();
