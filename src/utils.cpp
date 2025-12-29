@@ -20,8 +20,7 @@ std::vector<FeatureType> getAllObjectTypes(const std::vector<SpatialInstance>& i
     std::set<FeatureType> objectTypesSet;
     
     for (const auto& instance : instances) {
-        FeatureType objectType = instance.type;
-        objectTypesSet.insert(objectType);
+        objectTypesSet.insert(instance.type);
     }
     
     // Convert set to vector (set maintains sorted order)
@@ -36,8 +35,8 @@ std::map<FeatureType, int> countInstancesByFeature(const std::vector<SpatialInst
         // Extract feature type from instance ID
         // Assumes ID format is: FeatureType + Number (e.g., "A1", "B2")
         // Takes first character as feature type
-        FeatureType objectType = instance.id.substr(0, 1);
-        featureCount[objectType]++;
+        FeatureType featureType = instance.id.substr(0, 1);
+        featureCount[featureType]++;
     }
     
     return featureCount;
@@ -60,18 +59,19 @@ SpatialInstance getInstanceByID(
 }
 
 // Step 2: Sorting features in ascending order of the quantity of instances
-std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances) {
+std::vector<FeatureType> featureSort(const std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances) {
     // Generate feature counts using the helper function
-    std::map<FeatureType, int> featureCounts = countInstancesByFeature(instances);
+    const std::map<FeatureType, int> featureCounts = countInstancesByFeature(instances);
+    
+    // Create a copy to sort (input is const)
+    std::vector<FeatureType> sortedFeatures = featureSet;
 
     // Sort logic based on Algorithm 1 Step 2
     // Ascending order of instance counts
-    std::sort(featureSet.begin(), featureSet.end(), 
+    std::sort(sortedFeatures.begin(), sortedFeatures.end(), 
         [&featureCounts](const FeatureType& a, const FeatureType& b) {
-            int countA = 0;
-            int countB = 0;
-            if (featureCounts.find(a) != featureCounts.end()) countA = featureCounts.at(a);
-            if (featureCounts.find(b) != featureCounts.end()) countB = featureCounts.at(b);
+            const int countA = (featureCounts.find(a) != featureCounts.end()) ? featureCounts.at(a) : 0;
+            const int countB = (featureCounts.find(b) != featureCounts.end()) ? featureCounts.at(b) : 0;
             
             // Primary sort key: count (ascending)
             if (countA != countB) {
@@ -81,7 +81,7 @@ std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const
             return a < b;
         }
     );
-    return featureSet;
+    return sortedFeatures;
 }
 
 // Step 3: Calculating delta for the spatial dataset
@@ -111,29 +111,31 @@ double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std:
     // Paper: delta = 2/(m(m-1)) * Sum_{i<j} (|fj| / |fi|)
     // The indices i, j correspond to the sorted feature list order.
 
-    double m = static_cast<double>(counts.size());
+    double numFeatures = static_cast<double>(counts.size());
     double sumRatios = 0.0;
 
     // 3. Calculate sum of ratios for all pairs i < j
-    for (int i = 0; i < m; ++i) {
-        for (int j = i + 1; j < m; ++j) {
+    for (int i = 0; i < numFeatures; ++i) {
+        for (int j = i + 1; j < numFeatures; ++j) {
             // Formula uses |fj| / |fi| where i < j
             // Since features are sorted by count ascending, |fi| <= |fj| usually holds,
             // making the ratio >= 1 (or close to it/handling stability).
-            double numerator = counts[j];
+            const double numerator = counts[j];
             double denominator = counts[i];
             
             // Handle division by zero
-            if (denominator == 0) denominator = Constants::EPSILON_SMALL; 
+            if (denominator == 0.0) {
+                denominator = Constants::EPSILON_SMALL;
+            }
             
-            double ratio = numerator / denominator;
+            const double ratio = numerator / denominator;
             sumRatios += ratio;
         }
     }
 
     // 4. Calculate final Delta
-    // Factor = 2 / (m * (m - 1))
-    double factor = 2.0 / (m * (m - 1.0));
+    // Factor = 2 / (numFeatures * (numFeatures - 1))
+    const double factor = 2.0 / (numFeatures * (numFeatures - 1.0));
     
     return factor * sumRatios;
 }
@@ -164,7 +166,7 @@ double calculatePR(
     std::set<instanceID> distinctInstances;
 
 	// Look up tableInstance for the given pattern
-    auto it = tableInstance.find(pattern);
+    const auto it = tableInstance.find(pattern);
     if (it != tableInstance.end()) {
         const std::vector<ColocationInstance>& instancesList = it->second;
 
@@ -177,12 +179,12 @@ double calculatePR(
     }
 
     // 3. Get total count of featureType globally for denominator
-    int totalCount = 0;
-    if (featureCounts.find(featureType) != featureCounts.end()) {
-        totalCount = featureCounts.at(featureType);
-    }
+    const int totalCount = (featureCounts.find(featureType) != featureCounts.end()) 
+        ? featureCounts.at(featureType) : 0;
 
-    if (totalCount == 0) return 0.0;
+    if (totalCount == 0) {
+        return 0.0;
+    }
 
     // 4. Calculate PR
     return static_cast<double>(distinctInstances.size()) / static_cast<double>(totalCount);
@@ -195,7 +197,7 @@ double calculateRareIntensity(
     const FeatureType& rareType, 
     const Colocation& pattern,
     const std::map<FeatureType, int>& featureCounts,
-    double delta) 
+    const double delta) 
 {
     // Safety check for delta to avoid division by zero
     if (delta <= Constants::EPSILON_DELTA) return 0.0;
@@ -208,8 +210,9 @@ double calculateRareIntensity(
     // 1. Find num(f_min) in the pattern
     int minCount = -1;
     for (const auto& feature : pattern) {
-        if (featureCounts.find(feature) != featureCounts.end()) {
-            int count = featureCounts.at(feature);
+        const auto featureIt = featureCounts.find(feature);
+        if (featureIt != featureCounts.end()) {
+            const int count = featureIt->second;
             if (minCount == -1 || count < minCount) {
                 minCount = count;
             }
@@ -220,21 +223,21 @@ double calculateRareIntensity(
         }
     }
 
-    if (minCount <= 0) return 0.0; // Avoid division by zero in v calculation
-
-    // 2. Get num(fi) for the rareType
-    int rareCount = 0;
-    if (featureCounts.find(rareType) != featureCounts.end()) {
-        rareCount = featureCounts.at(rareType);
+    if (minCount <= 0) {
+        return 0.0; // Avoid division by zero in v calculation
     }
 
+    // 2. Get num(fi) for the rareType
+    const int rareCount = (featureCounts.find(rareType) != featureCounts.end()) 
+        ? featureCounts.at(rareType) : 0;
+
     // 3. Calculate v(fi, C) = num(fi) / num(f_min)
-    double v_val = static_cast<double>(rareCount) / static_cast<double>(minCount);
+    const double v_val = static_cast<double>(rareCount) / static_cast<double>(minCount);
 
     // 4. Calculate RI
     // exponent term = - (v - 1)^2 / (2 * delta^2)
-    double numerator = std::pow(v_val - 1.0, 2);
-    double denominator = 2.0 * delta * delta;
+    const double numerator = std::pow(v_val - 1.0, 2);
+    const double denominator = 2.0 * delta * delta;
     
     return std::exp(-numerator / denominator);
 }
@@ -251,13 +254,13 @@ double calculatePI(
     }
 
     double minPR = 1.0; // PR is a probability/ratio <= 1.0
-    bool first = true;
+    bool isFirstFeature = true;
 
     for (const auto& feature : pattern) {
         double pr = calculatePR(feature, pattern, tableInstance, featureCounts);
-        if (first) {
+        if (isFirstFeature) {
             minPR = pr;
-            first = false;
+            isFirstFeature = false;
         } else {
             if (pr < minPR) {
                 minPR = pr;

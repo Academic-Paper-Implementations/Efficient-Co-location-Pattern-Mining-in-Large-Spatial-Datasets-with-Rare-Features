@@ -51,7 +51,7 @@ SpatialInstance getInstanceByID(
  * @param featureSet The feature set to sort
  * @param instances The instances used to count feature frequency
  */
-std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
+std::vector<FeatureType> featureSort(const std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
 
 double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std::map<FeatureType, int>& featureCounts);
 

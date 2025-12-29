@@ -25,9 +25,9 @@ SpatialIndex::SpatialIndex(double distThresh)
  * @param b Second spatial instance
  * @return double Euclidean distance between a and b
  */
-double SpatialIndex::euclideanDist(const SpatialInstance& a, const SpatialInstance& b) {
-    double dx = a.x - b.x;
-    double dy = a.y - b.y;
+double SpatialIndex::euclideanDist(const SpatialInstance& a, const SpatialInstance& b) const {
+    const double dx = a.x - b.x;
+    const double dy = a.y - b.y;
     return std::sqrt(dx * dx + dy * dy);
 }
 
@@ -40,35 +40,40 @@ double SpatialIndex::euclideanDist(const SpatialInstance& a, const SpatialInstan
  * Uses grid-based spatial partitioning to optimize neighbor search from O(n²) to O(n).
  * Divides the spatial domain into grid cells and only checks instances in adjacent cells.
  */
-std::vector<std::pair<SpatialInstance, SpatialInstance>> SpatialIndex::findNeighborPair(const std::vector<SpatialInstance>& instances) {
+std::vector<std::pair<SpatialInstance, SpatialInstance>> SpatialIndex::findNeighborPair(const std::vector<SpatialInstance>& instances) const {
     std::vector<std::pair<SpatialInstance, SpatialInstance>> neighborPairs;
 
+    // Safety check: empty instances
+    if (instances.empty()) {
+        return neighborPairs;
+    }
+
     // Calculate spatial bounds
-    double minX = std::min_element(instances.begin(), instances.end(),
+    const double minX = std::min_element(instances.begin(), instances.end(),
         [](const SpatialInstance& a, const SpatialInstance& b) { return a.x < b.x; })->x;
-    double minY = std::min_element(instances.begin(), instances.end(),
+    const double minY = std::min_element(instances.begin(), instances.end(),
         [](const SpatialInstance& a, const SpatialInstance& b) { return a.y < b.y; })->y;
-    double maxX = std::max_element(instances.begin(), instances.end(),
+    const double maxX = std::max_element(instances.begin(), instances.end(),
         [](const SpatialInstance& a, const SpatialInstance& b) { return a.x < b.x; })->x;
-    double maxY = std::max_element(instances.begin(), instances.end(),
+    const double maxY = std::max_element(instances.begin(), instances.end(),
         [](const SpatialInstance& a, const SpatialInstance& b) { return a.y < b.y; })->y;
 
     // Create grid cells based on distance threshold
-    int gridX = static_cast<int>(std::ceil((maxX - minX) / distanceThreshold));
-    int gridY = static_cast<int>(std::ceil((maxY - minY) / distanceThreshold));
-    std::vector<std::vector<SpatialInstance>> gridCells(gridX * gridY);
+    const int gridCellsX = static_cast<int>(std::ceil((maxX - minX) / distanceThreshold));
+    const int gridCellsY = static_cast<int>(std::ceil((maxY - minY) / distanceThreshold));
+    std::vector<std::vector<SpatialInstance>> gridCells(gridCellsX * gridCellsY);
 
     // Assign instances to grid cells
     for (const auto& inst : instances) {
-        int cx = static_cast<int>((inst.x - minX) / distanceThreshold);
-        int cy = static_cast<int>((inst.y - minY) / distanceThreshold);
-        gridCells[cx * gridY + cy].push_back(inst);
+        const int cellX = static_cast<int>((inst.x - minX) / distanceThreshold);
+        const int cellY = static_cast<int>((inst.y - minY) / distanceThreshold);
+        gridCells[cellX * gridCellsY + cellY].push_back(inst);
     }
 
     // Check pairs within and between adjacent cells
-    for (int cx = 0; cx < gridX; ++cx) {
-        for (int cy = 0; cy < gridY; ++cy) {
-            const auto& cell = gridCells[cx * gridY + cy];
+    for (int cellX = 0; cellX < gridCellsX; ++cellX) {
+        for (int cellY = 0; cellY < gridCellsY; ++cellY) {
+            const auto& cell = gridCells[cellX * gridCellsY + cellY];
 
             // Check pairs within the same cell
             for (size_t i = 0; i < cell.size(); ++i) {
@@ -79,15 +84,17 @@ std::vector<std::pair<SpatialInstance, SpatialInstance>> SpatialIndex::findNeigh
                 }
                 
                 // Check pairs with adjacent cells (avoid duplicate checks)
-                for (int dx = 0; dx <= 1; ++dx) {
-                    for (int dy = (dx == 0 ? 1 : -1); dy <= 1; ++dy) {
-                        if (dx == 0 && dy == 0) continue;
+                for (int deltaX = 0; deltaX <= 1; ++deltaX) {
+                    for (int deltaY = (deltaX == 0 ? 1 : -1); deltaY <= 1; ++deltaY) {
+                        if (deltaX == 0 && deltaY == 0) {
+                            continue;
+                        }
                         
-                        int nx = cx + dx;
-                        int ny = cy + dy;
+                        const int neighborCellX = cellX + deltaX;
+                        const int neighborCellY = cellY + deltaY;
                         
-                        if (nx >= 0 && nx < gridX && ny >= 0 && ny < gridY) {
-                            const auto& neighborCell = gridCells[nx * gridY + ny];
+                        if (neighborCellX >= 0 && neighborCellX < gridCellsX && neighborCellY >= 0 && neighborCellY < gridCellsY) {
+                            const auto& neighborCell = gridCells[neighborCellX * gridCellsY + neighborCellY];
                             for (const auto& neighborInst : neighborCell) {
                                 if (cell[i].type != neighborInst.type && euclideanDist(cell[i], neighborInst) <= distanceThreshold) {
                                     neighborPairs.emplace_back(cell[i], neighborInst);

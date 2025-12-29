@@ -24,7 +24,7 @@ private:
      * @param b Second spatial instance
      * @return double Euclidean distance between a and b
      */
-    double euclideanDist(const SpatialInstance& a, const SpatialInstance& b);
+    double euclideanDist(const SpatialInstance& a, const SpatialInstance& b) const;
     
 public:
     /**
@@ -44,5 +44,5 @@ public:
      * @return std::vector<std::pair<SpatialInstance, SpatialInstance>> Vector of neighbor pairs
      * @note Time complexity: O(n²) where n is the number of instances
      */
-    std::vector<std::pair<SpatialInstance, SpatialInstance>> findNeighborPair(const std::vector<SpatialInstance>& instances);
+    std::vector<std::pair<SpatialInstance, SpatialInstance>> findNeighborPair(const std::vector<SpatialInstance>& instances) const;
 };

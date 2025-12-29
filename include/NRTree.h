@@ -11,12 +11,12 @@
 class NeighborhoodMgr;
 // ---------------------------------
 
-// Node type in tree for easy management
+// Node types in the NR-Tree for structured organization
 enum NodeType {
-    ROOT_NODE,
-    FEATURE_NODE,
-    INSTANCE_NODE,
-    INSTANCE_VECTOR_NODE
+    ROOT_NODE,              // Root of the tree
+    FEATURE_NODE,           // Node representing a feature type
+    INSTANCE_NODE,          // Node representing a spatial instance
+    INSTANCE_VECTOR_NODE    // Leaf node containing a vector of instances
 };
 
 // Structure of a node in the NR-Tree
@@ -24,15 +24,15 @@ struct NRNode {
     NodeType type;
 
     // Data depends on node type
-    FeatureType featureType;        // Used if FEATURE_NODE
-    const SpatialInstance* data;    // Used if INSTANCE_NODE or NEIGHBOR_NODE
-    std::vector<const SpatialInstance*> instanceVector;  // Used if INSTANCE_VECTOR_NODE
+    FeatureType featureType;                            // Used if FEATURE_NODE
+    const SpatialInstance* instancePtr;                 // Used if INSTANCE_NODE
+    std::vector<const SpatialInstance*> instanceVector; // Used if INSTANCE_VECTOR_NODE
 
     // List of children
     std::vector<NRNode*> children;
 
-    // Constructor helper
-    NRNode(NodeType t) : type(t), data(nullptr), featureType("") {}
+    // Constructor
+    NRNode(NodeType nodeType) : type(nodeType), instancePtr(nullptr), featureType("") {}
 
     ~NRNode() {
         for (auto child : children) delete child;
@@ -51,11 +51,11 @@ public:
     NRTree();
     ~NRTree();
 
-    // Most important function: Build tree from NeighborhoodMgr results
-    // According to paper: features must be sorted by instance count (ascending)
+    // Build tree from NeighborhoodMgr results
+    // Features must be sorted by instance count (ascending) according to the paper
     void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts);
 
-    // Function to print tree to screen for verification
+    // Print tree structure for debugging and verification
     void printTree() const;
 
     // Getter for root if external processing needed

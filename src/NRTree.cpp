@@ -35,14 +35,14 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
             return a < b; // Lexicographic tie-breaker
         });
 
-    for (const auto& fType : sortedFeatures) {
+    for (const auto& featureType : sortedFeatures) {
         // Create feature node (e.g., Node A)
-        NRNode* fNode = new NRNode(FEATURE_NODE);
-        fNode->featureType = fType;
-        root->children.push_back(fNode);
+        NRNode* featureNode = new NRNode(FEATURE_NODE);
+        featureNode->featureType = featureType;
+        root->children.push_back(featureNode);
 
         // Get list of center instances for this feature
-        const auto& starList = rawMap.at(fType);
+        const auto& starList = rawMap.at(featureType);
 
         // 2. LEVEL 2: INSTANCE NODES (Center)
         // Sort instance centers by ID for consistent ordering
@@ -57,8 +57,8 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
 
         for (const auto& star : sortedStarList) {
             NRNode* centerNode = new NRNode(INSTANCE_NODE);
-            centerNode->data = star.center; // Store pointer to original data
-            fNode->children.push_back(centerNode);
+            centerNode->instancePtr = star.center; // Store pointer to original data
+            featureNode->children.push_back(centerNode);
 
             // 3. LEVEL 3: FEATURE NODES (for neighbor features)
             // Neighbor data is in: star.neighbors (unordered_map<FeatureType, vector<const SpatialInstance*>>)
@@ -132,8 +132,8 @@ void NRTree::printRecursive(NRNode* node, int level) const {
         std::cout << indent << "+ Feature: " << node->featureType << "\n";
     }
     else if (node->type == INSTANCE_NODE) {
-        std::cout << indent << "- Instance: " << node->data->id
-            << " [" << node->data->type << "]\n";
+        std::cout << indent << "- Instance: " << node->instancePtr->id
+            << " [" << node->instancePtr->type << "]\n";
     }
     else if (node->type == INSTANCE_VECTOR_NODE) {
         std::cout << indent << "- Instance Vector (" << node->instanceVector.size() << " instances): [";
