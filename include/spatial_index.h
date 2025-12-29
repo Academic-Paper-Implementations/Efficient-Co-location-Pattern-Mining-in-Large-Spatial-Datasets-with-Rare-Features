@@ -32,7 +32,7 @@ public:
      * 
      * @param distThresh Maximum distance for two instances to be considered neighbors
      */
-    SpatialIndex(double distThresh);
+    explicit SpatialIndex(double distThresh);
 
     /**
      * @brief Find all neighbor pairs within the distance threshold

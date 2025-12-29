@@ -10,6 +10,7 @@
 #include <string>
 #include <chrono>
 #include <map>
+#include <optional>
 
 /**
  * @brief Get all unique feature types from spatial instances
@@ -35,14 +36,13 @@ std::map<FeatureType, int> countInstancesByFeature(const std::vector<SpatialInst
 /**
  * @brief Find a spatial instance by its ID
  * 
- * Searches for an instance with the specified ID. Returns an empty
- * SpatialInstance struct if no matching instance is found.
+ * Searches for an instance with the specified ID.
  * 
  * @param instances Vector of spatial instances to search
  * @param id Instance ID to find
- * @return SpatialInstance The found instance, or empty struct if not found
+ * @return std::optional<SpatialInstance> The found instance, or std::nullopt if not found
  */
-SpatialInstance getInstanceByID(
+std::optional<SpatialInstance> getInstanceByID(
     const std::vector<SpatialInstance>& instances, 
     const instanceID& id);
 

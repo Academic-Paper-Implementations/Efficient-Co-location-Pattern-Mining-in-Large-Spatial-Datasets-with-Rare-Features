@@ -43,7 +43,8 @@ std::map<FeatureType, int> countInstancesByFeature(const std::vector<SpatialInst
 }
 
 
-SpatialInstance getInstanceByID(
+
+std::optional<SpatialInstance> getInstanceByID(
     const std::vector<SpatialInstance>& instances, 
     const instanceID& id) 
 {
@@ -54,8 +55,8 @@ SpatialInstance getInstanceByID(
         }
     }
     
-    // Return empty instance if not found
-    return SpatialInstance{};
+    // Return nullopt if not found
+    return std::nullopt;
 }
 
 // Step 2: Sorting features in ascending order of the quantity of instances

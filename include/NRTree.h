@@ -33,12 +33,19 @@ struct NRNode {
     std::vector<NRNode*> children;
 
     // Constructor
-    NRNode(NodeType nodeType) : type(nodeType), instancePtr(nullptr), featureType("") {}
+    explicit NRNode(NodeType nodeType) : type(nodeType), instancePtr(nullptr), featureType("") {}
 
+    // Destructor
     ~NRNode() {
         for (auto child : children) delete child;
         children.clear();
     }
+
+    // Rule of 5: Delete copy (manages raw pointers), default move
+    NRNode(const NRNode&) = delete;
+    NRNode& operator=(const NRNode&) = delete;
+    NRNode(NRNode&&) = default;
+    NRNode& operator=(NRNode&&) = default;
 };
 
 class NRTree {
@@ -51,6 +58,12 @@ private:
 public:
     NRTree();
     ~NRTree();
+
+    // Rule of 5: Delete copy (unique_ptr member), default move
+    NRTree(const NRTree&) = delete;
+    NRTree& operator=(const NRTree&) = delete;
+    NRTree(NRTree&&) = default;
+    NRTree& operator=(NRTree&&) = default;
 
     // Build tree from NeighborhoodMgr results
     // Features must be sorted by instance count (ascending) according to the paper
