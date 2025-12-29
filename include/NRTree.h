@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include <map>
+#include <memory>
 #include "neighborhood_mgr.h" // To use struct OrderedNeigh and FeatureType
 #include "types.h"
 
@@ -42,7 +43,7 @@ struct NRNode {
 
 class NRTree {
 private:
-    NRNode* root;
+    std::unique_ptr<NRNode> root;
 
     // Recursive function to print tree (for debugging purposes)
     void printRecursive(NRNode* node, int level) const;
@@ -59,5 +60,5 @@ public:
     void printTree() const;
 
     // Getter for root if external processing needed
-    const NRNode* getRoot() const { return root; }
+    const NRNode* getRoot() const { return root.get(); }
 };

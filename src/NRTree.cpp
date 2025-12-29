@@ -1,20 +1,13 @@
 ﻿#include "NRTree.h"
 
-NRTree::NRTree() {
-    root = new NRNode(ROOT_NODE);
+NRTree::NRTree() : root(std::make_unique<NRNode>(ROOT_NODE)) {
 }
 
-NRTree::~NRTree() {
-    if (root) {
-        delete root; // Node destructor will automatically delete children recursively
-        root = nullptr;
-    }
-}
+NRTree::~NRTree() = default;
 
 void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts) {
     // 0. Reset tree if old data exists
-    if (root) delete root;
-    root = new NRNode(ROOT_NODE);
+    root = std::make_unique<NRNode>(ROOT_NODE);
 
     // Get raw map data: unordered_map<FeatureType, vector<OrderedNeigh>>
     const auto& rawMap = neighMgr.getOrderedNeighbors();
@@ -23,6 +16,7 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
     // According to paper: Features must be sorted by instance count (ascending order)
     // Same logic as in isOrdered() and featureSort()
     std::vector<FeatureType> sortedFeatures;
+    sortedFeatures.reserve(rawMap.size());
     for (const auto& pair : rawMap) {
         sortedFeatures.push_back(pair.first);
     }
@@ -66,6 +60,7 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
 
             // Get list of neighbor feature types and sort by feature count
             std::vector<FeatureType> neighborFeatureTypes;
+            neighborFeatureTypes.reserve(star.neighbors.size());
             for (const auto& mapEntry : star.neighbors) {
                 neighborFeatureTypes.push_back(mapEntry.first);
             }
@@ -116,7 +111,7 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
 
 void NRTree::printTree() const {
     std::cout << "\n=== ORDERED NR-TREE STRUCTURE ===\n";
-    printRecursive(root, 0);
+    printRecursive(root.get(), 0);
     std::cout << "=================================\n";
 }
 

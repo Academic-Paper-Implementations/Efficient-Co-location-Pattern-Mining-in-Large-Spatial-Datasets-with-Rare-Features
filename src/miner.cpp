@@ -57,6 +57,7 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     std::vector<Colocation> allPrevalentColocations;
 
     // Khởi tạo P1 (Prevalent k=1)
+    prevColocations.reserve(sortedTypes.size());
     for (const auto& featureType : sortedTypes) {
         prevColocations.push_back({ featureType });
     }
