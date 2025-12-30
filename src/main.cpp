@@ -42,10 +42,10 @@ int main(int argc, char* argv[]) {
     // Step 2: Load Data
     // ========================================================================
     printSectionHeader("STEP 2: LOAD DATA");
-    auto t_load_start = std::chrono::high_resolution_clock::now();
-    auto instances = DataLoader::load_csv(config.datasetPath);
-    auto t_load_end = std::chrono::high_resolution_clock::now();
-    double load_time = std::chrono::duration<double, std::milli>(t_load_end - t_load_start).count();
+    const auto loadStartTime = std::chrono::high_resolution_clock::now();
+    const auto instances = DataLoader::load_csv(config.datasetPath);
+    const auto loadEndTime = std::chrono::high_resolution_clock::now();
+    const double load_time = std::chrono::duration<double, std::milli>(loadEndTime - loadStartTime).count();
 
     std::cout << "[DATA] Loaded " << instances.size() << " instances.\n";
     std::cout << "[TIME] Load time: " << std::fixed << std::setprecision(2) << load_time << " ms\n";
@@ -54,11 +54,11 @@ int main(int argc, char* argv[]) {
     // Step 3: Build Spatial Index
     // ========================================================================
     printSectionHeader("STEP 3: SPATIAL INDEXING");
-    auto t_idx_start = std::chrono::high_resolution_clock::now();
+    const auto indexStartTime = std::chrono::high_resolution_clock::now();
     SpatialIndex spatial_idx(config.neighborDistance);
-    auto neighborPairs = spatial_idx.findNeighborPair(instances);
-    auto t_idx_end = std::chrono::high_resolution_clock::now();
-    double idx_time = std::chrono::duration<double, std::milli>(t_idx_end - t_idx_start).count();
+    const auto neighborPairs = spatial_idx.findNeighborPair(instances);
+    const auto indexEndTime = std::chrono::high_resolution_clock::now();
+    const double idx_time = std::chrono::duration<double, std::milli>(indexEndTime - indexStartTime).count();
 
     std::cout << "[DATA] Found " << neighborPairs.size() << " neighbor pairs.\n";
     std::cout << "[TIME] Indexing time: " << std::fixed << std::setprecision(2) << idx_time << " ms\n";
@@ -67,8 +67,8 @@ int main(int argc, char* argv[]) {
     // Step 4: Materialize Neighborhoods
     // ========================================================================
     printSectionHeader("STEP 4: NEIGHBORHOOD MATERIALIZATION");
-    auto t_mat_start = std::chrono::high_resolution_clock::now();
-    std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
+    const auto materializationStartTime = std::chrono::high_resolution_clock::now();
+    const std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
 
     NeighborhoodMgr neighbor_mgr;
     neighbor_mgr.buildFromPairs(neighborPairs, featureCount);
@@ -76,8 +76,8 @@ int main(int argc, char* argv[]) {
     NRTree orderedNRTree;
     orderedNRTree.build(neighbor_mgr, featureCount);
 
-    auto t_mat_end = std::chrono::high_resolution_clock::now();
-    double mat_time = std::chrono::duration<double, std::milli>(t_mat_end - t_mat_start).count();
+    const auto materializationEndTime = std::chrono::high_resolution_clock::now();
+    const double mat_time = std::chrono::duration<double, std::milli>(materializationEndTime - materializationStartTime).count();
 
     std::cout << "[INFO] Feature Counts:\n";
     for (const auto& pair : featureCount) {
@@ -105,9 +105,9 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     printSectionHeader("FINAL SUMMARY");
 
-    auto programEnd = std::chrono::high_resolution_clock::now();
-    double totalTimeSec = std::chrono::duration<double>(programEnd - programStart).count();
-    double maxMemory = getMemoryUsageMB();
+    const auto programEnd = std::chrono::high_resolution_clock::now();
+    const double totalTimeSec = std::chrono::duration<double>(programEnd - programStart).count();
+    const double maxMemory = getMemoryUsageMB();
 
     std::cout << std::left << std::setw(35) << "Total Prevalent Patterns:" << colocations.size() << "\n";
     std::cout << std::left << std::setw(35) << "Total Execution Time:" << std::fixed << std::setprecision(4) << totalTimeSec << " s\n";

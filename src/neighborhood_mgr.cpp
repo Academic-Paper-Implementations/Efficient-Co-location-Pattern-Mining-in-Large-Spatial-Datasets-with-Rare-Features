@@ -50,37 +50,37 @@ void NeighborhoodMgr::buildFromPairs(const std::vector<std::pair<SpatialInstance
 
         // Check if neighbor belongs to center's ordered neighborhood
         if (isOrdered(center.type, neighbor.type, featureCounts)) {
-            auto& vec = orderedNeighborMap[center.type];
-            auto it = std::find_if(vec.begin(), vec.end(), [&](const OrderedNeigh& set) {
+            auto& neighborhoodList = orderedNeighborMap[center.type];
+            auto existingNeighborhood = std::find_if(neighborhoodList.begin(), neighborhoodList.end(), [&](const OrderedNeigh& set) {
                 return set.center->id == center.id;
                 });
                 
-            if (it != vec.end()) {
-                it->neighbors[neighbor.type].push_back(&neighbor);
+            if (existingNeighborhood != neighborhoodList.end()) {
+                existingNeighborhood->neighbors[neighbor.type].push_back(&neighbor);
             }
             else {
                 OrderedNeigh newSet;
                 newSet.center = &center;
                 newSet.neighbors[neighbor.type].push_back(&neighbor);
-                vec.push_back(newSet);
+                neighborhoodList.push_back(newSet);
             }
         }
         
         // Check if center belongs to neighbor's ordered neighborhood
         if (isOrdered(neighbor.type, center.type, featureCounts)) {
-            auto& vec = orderedNeighborMap[neighbor.type];
-            auto it = std::find_if(vec.begin(), vec.end(), [&](const OrderedNeigh& set) {
+            auto& neighborhoodList = orderedNeighborMap[neighbor.type];
+            auto existingNeighborhood = std::find_if(neighborhoodList.begin(), neighborhoodList.end(), [&](const OrderedNeigh& set) {
                 return set.center->id == neighbor.id;
                 });
                 
-            if (it != vec.end()) {
-                it->neighbors[center.type].push_back(&center);
+            if (existingNeighborhood != neighborhoodList.end()) {
+                existingNeighborhood->neighbors[center.type].push_back(&center);
             }
             else {
                 OrderedNeigh newSet;
                 newSet.center = &neighbor;
                 newSet.neighbors[center.type].push_back(&center);
-                vec.push_back(newSet);
+                neighborhoodList.push_back(newSet);
             }
         }
     }

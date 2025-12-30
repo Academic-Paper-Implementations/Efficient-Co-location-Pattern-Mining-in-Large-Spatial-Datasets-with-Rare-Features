@@ -31,7 +31,7 @@ using ProgressCallback = std::function<void(int, int, const std::string&, double
 class JoinlessMiner {
 private:
     double minPrev;                          ///< Minimum prevalence threshold
-    NRTree* orderedNRTree;        ///< Pointer to neighborhood manager
+    NRTree* orderedNRTree;                   ///< Non-owning pointer to ordered NR-tree
     ProgressCallback progressCallback;        ///< Progress reporting callback
 
     std::map<Colocation, std::vector<ColocationInstance>> genTableInstance(
