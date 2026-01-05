@@ -1,46 +1,35 @@
 # ==============================================================================
 # Project Configuration
 # ==============================================================================
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.10)
 
 # Set project name
 project ("Ordered NR Tree")
 
-# Set C++17 standard (as specified in c_cpp_properties)
 set (CMAKE_CXX_STANDARD 17)
 
 # ==============================================================================
-# Include Directories
+# Include & Source
 # ==============================================================================
-# Declare directory containing .h files (replaces -I in tasks.json)
 include_directories ("${CMAKE_SOURCE_DIR}/include")
-
-# ==============================================================================
-# Source Files
-# ==============================================================================
-# Find all .cpp files (replaces *.cpp args in tasks.json)
 file(GLOB SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 # ==============================================================================
 # Build Target
 # ==============================================================================
-# Create executable
 add_executable (main ${SOURCE_FILES})
 
 # ======================================================================
-# Runtime config copy (IMPORTANT)
+# Runtime config copy
 # ======================================================================
-add_custom_command(TARGET main POST_BUILD
+add_custom_target(copy_resources
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/config"
-        "$<TARGET_FILE_DIR:main>/config"
-    COMMENT "Copying config folder to output directory..."
-)
-
-# 2. Copy thư mục data
-add_custom_command(TARGET main POST_BUILD
+        "${CMAKE_CURRENT_BINARY_DIR}/config"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/data"
-        "$<TARGET_FILE_DIR:main>/data"
-    COMMENT "Copying data folder to output directory..."
+        "${CMAKE_CURRENT_BINARY_DIR}/data"
+    COMMENT "Auto-copying resources to build folder..."
 )
+
+add_dependencies(main copy_resources)
