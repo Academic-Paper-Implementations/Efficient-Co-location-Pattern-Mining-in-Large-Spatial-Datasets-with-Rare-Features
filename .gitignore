@@ -32,4 +32,5 @@ spatial_index
 out/
 /src/test_mgr.cpp
 /data/plant_big_100_ex_checkin.csv
+/data/plant_big_100_ex_checkin.csv
 /enc_temp_folder
