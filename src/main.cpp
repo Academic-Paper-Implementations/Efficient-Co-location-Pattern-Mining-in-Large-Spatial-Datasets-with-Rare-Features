@@ -13,16 +13,13 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-#include <windows.h>
 #include <iomanip>
-#include <psapi.h>
 
- // Helper for separating sections
-void printSectionHeader(const std::string& title) {
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << " " << title << "\n";
-    std::cout << std::string(60, '=') << "\n";
-}
+ //Show memmory usage
+#include <windows.h>
+#include <psapi.h>
+#include <stdio.h>
+#pragma comment(lib, "psapi.lib")
 
 int main(int argc, char* argv[]) {
     auto programStart = std::chrono::high_resolution_clock::now();
@@ -30,13 +27,9 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Step 1: Load Configuration
     // ========================================================================
-    printSectionHeader("STEP 1: CONFIGURATION");
+    std::cout << "Running... (Results will be saved to result.txt)\n";
     std::string config_path = (argc > 1) ? argv[1] : "./config/config.txt";
     AppConfig config = ConfigLoader::load(config_path);
-
-    std::cout << std::left << std::setw(25) << "Dataset Path:" << config.datasetPath << "\n";
-    std::cout << std::left << std::setw(25) << "Neighbor Distance (d):" << config.neighborDistance << "\n";
-    std::cout << std::left << std::setw(25) << "Min Prevalence:" << config.minPrev << "\n";
 
     // ========================================================================
     // Step 2: Load Data
@@ -88,14 +81,10 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Step 5: Mine Colocation Patterns
     // ========================================================================
-    printSectionHeader("STEP 5: MINING PROCESS");
     JoinlessMiner miner;
 
     // Callback đơn giản hơn, không dùng \r để tránh mất log debug
     auto progressCallback = [](int currentStep, int totalSteps, const std::string& message, double percentage) {
-        // Chỉ in các mốc quan trọng hoặc message cụ thể nếu cần, 
-        // ở đây ta để hàm mineColocations tự in log chi tiết nên callback có thể để trống hoặc in tối giản
-        // std::cout << "[PROG] " << message << "\n"; 
         };
 
     auto colocations = miner.mineColocations(config.minPrev, orderedNRTree, instances, featureCount, progressCallback);
@@ -113,21 +102,23 @@ int main(int argc, char* argv[]) {
     std::cout << std::left << std::setw(35) << "Total Execution Time:" << std::fixed << std::setprecision(4) << totalTimeSec << " s\n";
     std::cout << std::left << std::setw(35) << "Peak Memory Usage:" << std::fixed << std::setprecision(2) << maxMemory << " MB\n";
 
+    // (E) List of Patterns
     if (!colocations.empty()) {
-        std::cout << "\n[PATTERNS FOUND]\n";
         int idx = 1;
         for (const auto& col : colocations) {
-            std::cout << std::right << std::setw(3) << idx++ << ". {";
+            outFile << "[" << idx++ << "] {";
             for (size_t i = 0; i < col.size(); ++i) {
-                std::cout << (i > 0 ? ", " : "") << col[i];
+                outFile << (i > 0 ? ", " : "") << col[i];
             }
-            std::cout << "}\n";
+            outFile << "}\n";
         }
     }
     else {
-        std::cout << "\n[RESULT] No patterns found satisfying the threshold.\n";
+        outFile << "No patterns found.\n";
     }
 
-    std::cout << "\nMining completed.\n";
+    outFile.close();
+
+    std::cout << "Done! Please check 'result.txt'.\n";
     return 0;
 }
