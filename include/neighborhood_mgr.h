@@ -5,7 +5,7 @@
 
 #pragma once
 #include "types.h"
-#include <unordered_map>
+#include <map>
 #include <vector>
 #include "NRTree.h"
 
@@ -26,20 +26,23 @@ public:
      * @param pairs Vector of neighbor pairs found by spatial indexing
      */
     void buildFromPairs(const std::vector<std::pair<SpatialInstance, SpatialInstance>>& pairs,
-                        const std::unordered_map<FeatureType, int>&FeatureCounts);
+                        const std::map<FeatureType, int>&FeatureCounts);
     
-    // kiểu trả về khớp với biến thành viên
+    /**
+     * @brief Get the ordered neighborhood map
+     * @return const reference to the ordered neighborhood map
+     */
     const std::unordered_map<FeatureType, std::vector<OrderedNeigh>>& getOrderedNeighbors() const;
     
 
 private:
     /**
-     * @brief Lưu trữ Neigh: Map từ FeatureType -> Danh sách các OrderedNeigh
+     * @brief Store Neigh: Map from FeatureType to list of OrderedNeigh
      */
     std::unordered_map<FeatureType, std::vector<OrderedNeigh>> orderedNeighborMap;
 
-    // Hàm kiểm tra thứ tự
+    // Function to check ordering
     bool isOrdered(const FeatureType& centerType,
         const FeatureType& neighborType,
-        const std::unordered_map<FeatureType, int>& counts);
+        const std::map<FeatureType, int>& counts);
 };

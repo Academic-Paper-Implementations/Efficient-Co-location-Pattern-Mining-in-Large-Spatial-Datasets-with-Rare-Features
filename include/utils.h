@@ -10,6 +10,7 @@
 #include <string>
 #include <chrono>
 #include <map>
+#include <optional>
 
 /**
  * @brief Get all unique feature types from spatial instances
@@ -35,14 +36,13 @@ std::map<FeatureType, int> countInstancesByFeature(const std::vector<SpatialInst
 /**
  * @brief Find a spatial instance by its ID
  * 
- * Searches for an instance with the specified ID. Returns an empty
- * SpatialInstance struct if no matching instance is found.
+ * Searches for an instance with the specified ID.
  * 
  * @param instances Vector of spatial instances to search
  * @param id Instance ID to find
- * @return SpatialInstance The found instance, or empty struct if not found
+ * @return std::optional<SpatialInstance> The found instance, or std::nullopt if not found
  */
-SpatialInstance getInstanceByID(
+std::optional<SpatialInstance> getInstanceByID(
     const std::vector<SpatialInstance>& instances, 
     const instanceID& id);
 
@@ -51,7 +51,7 @@ SpatialInstance getInstanceByID(
  * @param featureSet The feature set to sort
  * @param instances The instances used to count feature frequency
  */
-std::vector<FeatureType> featureSort(std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
+std::vector<FeatureType> featureSort(const std::vector<FeatureType>& featureSet, const std::vector<SpatialInstance>& instances);
 
 double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std::map<FeatureType, int>& featureCounts);
 
@@ -67,7 +67,7 @@ double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std:
 double calculatePR(
     const FeatureType& featureType,
     const Colocation& pattern,
-    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
     const std::map<FeatureType, int>& featureCounts);
 /**
  * @brief Calculate Rare Intensity (RI) for a feature in a pattern
@@ -96,7 +96,7 @@ double calculateRareIntensity(
  */
 double calculatePI(
     const Colocation& pattern,
-    const std::vector<ColocationInstance>& tableInstance,
+    const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
     const std::map<FeatureType, int>& featureCounts);
 /**
 * @brief Recursive helper to find all combinations of spatial instances

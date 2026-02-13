@@ -1,118 +1,89 @@
 ﻿#include "NRTree.h"
+#include "utils.h"
 
-NRTree::NRTree() {
-    root = new NRNode(ROOT_NODE);
+NRTree::NRTree() : root(std::make_unique<NRNode>(ROOT_NODE)) {
 }
 
-NRTree::~NRTree() {
-    if (root) {
-        delete root; // Destructor của Node sẽ tự động delete các con đệ quy
-        root = nullptr;
-    }
-}
+NRTree::~NRTree() = default;
 
-void NRTree::build(const NeighborhoodMgr& neighMgr, const std::unordered_map<FeatureType, int>& featureCounts) {
-    // 0. Reset cây nếu đã có dữ liệu cũ
-    if (root) delete root;
-    root = new NRNode(ROOT_NODE);
+void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances) {
+    // 0. Reset tree if old data exists
+    root = std::make_unique<NRNode>(ROOT_NODE);
 
-    // Lấy dữ liệu map thô: unordered_map<FeatureType, vector<OrderedNeigh>>
+    // Get raw map data: unordered_map<FeatureType, vector<OrderedNeigh>>
     const auto& rawMap = neighMgr.getOrderedNeighbors();
 
     // 1. LEVEL 1: FEATURE NODES
-    // Theo paper: Features phải được sắp xếp theo số lượng instance (ascending order)
-    // Giống với logic trong isOrdered() và featureSort()
+    // According to paper: Features must be sorted by instance count (ascending order)
+    // Same logic as in isOrdered() and featureSort()
     std::vector<FeatureType> sortedFeatures;
     for (const auto& pair : rawMap) {
         sortedFeatures.push_back(pair.first);
     }
-    // Sắp xếp Feature theo số lượng instance (ascending), sau đó theo lexicographic
-    std::sort(sortedFeatures.begin(), sortedFeatures.end(),
-        [&featureCounts](const FeatureType& a, const FeatureType& b) {
-            int countA = featureCounts.count(a) ? featureCounts.at(a) : 0;
-            int countB = featureCounts.count(b) ? featureCounts.at(b) : 0;
-            if (countA != countB) return countA < countB;
-            return a < b; // Lexicographic tie-breaker
-        });
+	//Sort features by feature count (ascending)
+	sortedFeatures = featureSort(sortedFeatures, instances);
 
-    for (const auto& fType : sortedFeatures) {
-        // Tạo nút Feature (VD: Node A)
-        NRNode* fNode = new NRNode(FEATURE_NODE);
-        fNode->featureType = fType;
-        root->children.push_back(fNode);
+    for (const auto& featureType : sortedFeatures) {
+        // Create feature node (e.g., Node A) - exception safe with unique_ptr
+        auto featureNode = std::make_unique<NRNode>(FEATURE_NODE);
+        featureNode->featureType = featureType;
 
-        // Lấy danh sách các Center Instance thuộc Feature này
-        const auto& starList = rawMap.at(fType);
+        // Get list of center instances for this feature
+        const auto& starList = rawMap.at(featureType);
 
         // 2. LEVEL 2: INSTANCE NODES (Center)
-        // Sắp xếp các instance centers theo ID để đảm bảo thứ tự nhất quán
-        std::vector<OrderedNeigh> sortedStarList = starList;
-        std::sort(sortedStarList.begin(), sortedStarList.end(),
-            [](const OrderedNeigh& a, const OrderedNeigh& b) {
-                return a.center->id < b.center->id;
-            });
-
-        for (const auto& star : sortedStarList) {
+        for (const auto& star : starList) {
             NRNode* centerNode = new NRNode(INSTANCE_NODE);
-            centerNode->data = star.center; // Lưu con trỏ đến dữ liệu gốc
+            centerNode->data = star.center; // Store pointer to original data
             fNode->children.push_back(centerNode);
 
-            // 3. LEVEL 3: FEATURE NODES (cho neighbor features)
-            // Dữ liệu hàng xóm đang nằm trong: star.neighbors (là unordered_map<FeatureType, vector<const SpatialInstance*>>)
-            // Ta cần tạo FEATURE_NODE cho mỗi feature type của neighbor, sắp xếp theo feature count
+            // 3. LEVEL 3: FEATURE NODES (for neighbor features)
+            // Neighbor data is in: star.neighbors (unordered_map<FeatureType, vector<const SpatialInstance*>>)
+            // We need to create FEATURE_NODE for each neighbor feature type, sorted by feature count
 
-            // Lấy danh sách các feature types của neighbors và sắp xếp theo feature count
+            // Get list of neighbor feature types and sort by feature count
             std::vector<FeatureType> neighborFeatureTypes;
             for (const auto& mapEntry : star.neighbors) {
                 neighborFeatureTypes.push_back(mapEntry.first);
             }
+			// Sort neighbor feature types by feature count (ascending)
+			neighborFeatureTypes = featureSort(neighborFeatureTypes, instances);
 
-            // Sắp xếp neighbor feature types theo feature count (ascending), sau đó lexicographic
-            std::sort(neighborFeatureTypes.begin(), neighborFeatureTypes.end(),
-                [&featureCounts](const FeatureType& a, const FeatureType& b) {
-                    int countA = featureCounts.count(a) ? featureCounts.at(a) : 0;
-                    int countB = featureCounts.count(b) ? featureCounts.at(b) : 0;
-                    if (countA != countB) return countA < countB;
-                    return a < b; // Lexicographic tie-breaker
-                });
-
-            // Tạo FEATURE_NODE cho mỗi neighbor feature type
+            // Create FEATURE_NODE for each neighbor feature type
             for (const auto& neighborFeatureType : neighborFeatureTypes) {
-                NRNode* neighborFeatureNode = new NRNode(FEATURE_NODE);
+                // Exception safe allocation
+                auto neighborFeatureNode = std::make_unique<NRNode>(FEATURE_NODE);
                 neighborFeatureNode->featureType = neighborFeatureType;
-                centerNode->children.push_back(neighborFeatureNode);
 
-                // 4. LEVEL 4: INSTANCE_VECTOR_NODE (một node duy nhất chứa vector các neighbor instances)
-                // Lấy danh sách instances của feature type này và sắp xếp theo ID (alphabetical)
+                // 4. LEVEL 4: INSTANCE_VECTOR_NODE (single node containing vector of neighbor instances)
+                // Get list of instances for this feature type and sort by ID (alphabetical)
                 const auto& neighborInstances = star.neighbors.at(neighborFeatureType);
-                std::vector<const SpatialInstance*> sortedNeighborInstances = neighborInstances;
 
-                // Sắp xếp theo ID (alphabetical order)
-                std::sort(sortedNeighborInstances.begin(), sortedNeighborInstances.end(),
-                [](const SpatialInstance* a, const SpatialInstance* b) {
-                    if (a->type != b->type) return a->type < b->type;
-                    return a->id < b->id;
-                });
-
-                // Tạo một INSTANCE_VECTOR_NODE duy nhất để lưu vector các neighbor instances
+                // Create single INSTANCE_VECTOR_NODE to store vector of neighbor instances
                 NRNode* instanceVectorNode = new NRNode(INSTANCE_VECTOR_NODE);
-                instanceVectorNode->instanceVector = sortedNeighborInstances;  // Lưu toàn bộ vector
+                instanceVectorNode->instanceVector = neighborInstances;  // Store entire vector
                 neighborFeatureNode->children.push_back(instanceVectorNode);
             }
+
+            // Add center node to feature node after building its children
+            featureNode->children.push_back(centerNode.release());
         }
+
+        // Add feature node to root after building its children
+        root->children.push_back(featureNode.release());
     }
 }
 
-// --- Phần hỗ trợ hiển thị (Debug) ---
+// --- Support functions for display (Debug) ---
 
 void NRTree::printTree() const {
     std::cout << "\n=== ORDERED NR-TREE STRUCTURE ===\n";
-    printRecursive(root, 0);
+    printRecursive(root.get(), 0);
     std::cout << "=================================\n";
 }
 
 void NRTree::printRecursive(NRNode* node, int level) const {
-    // Thụt đầu dòng theo cấp độ
+    // Indent according to level
     std::string indent = "";
     for (int i = 0; i < level; i++) indent += "  | ";
 
@@ -123,8 +94,8 @@ void NRTree::printRecursive(NRNode* node, int level) const {
         std::cout << indent << "+ Feature: " << node->featureType << "\n";
     }
     else if (node->type == INSTANCE_NODE) {
-        std::cout << indent << "- Instance: " << node->data->id
-            << " [" << node->data->type << "]\n";
+        std::cout << indent << "- Instance: " << node->instancePtr->id
+            << " [" << node->instancePtr->type << "]\n";
     }
     else if (node->type == INSTANCE_VECTOR_NODE) {
         std::cout << indent << "- Instance Vector (" << node->instanceVector.size() << " instances): [";
@@ -135,17 +106,17 @@ void NRTree::printRecursive(NRNode* node, int level) const {
             first = false;
     }
         std::cout << "]\n";
-        return; // INSTANCE_VECTOR_NODE là lá, không có con
+        return; // INSTANCE_VECTOR_NODE is a leaf, no children
     }
 
-    // Cấu trúc cây mới:
+    // New tree structure:
     // Level 1: FEATURE_NODE (center feature, sorted by feature count)
     // Level 2: INSTANCE_NODE (center instance, sorted by ID)
     // Level 3: FEATURE_NODE (neighbor feature, sorted by feature count)
-    // Level 4: INSTANCE_VECTOR_NODE (vector các neighbor instances, sorted alphabetically by ID)
-    // INSTANCE_VECTOR_NODE là lá, không có con
+    // Level 4: INSTANCE_VECTOR_NODE (vector of neighbor instances, sorted alphabetically by ID)
+    // INSTANCE_VECTOR_NODE is a leaf, no children
 
-    // Đệ quy in các con
+    // Recursively print children
     for (auto child : node->children) {
         printRecursive(child, level + 1);
     }

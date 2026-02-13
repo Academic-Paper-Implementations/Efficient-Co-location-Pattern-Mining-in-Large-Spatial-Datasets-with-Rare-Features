@@ -31,26 +31,26 @@ using ProgressCallback = std::function<void(int, int, const std::string&, double
 class JoinlessMiner {
 private:
     double minPrev;                          ///< Minimum prevalence threshold
-    NRTree* orderedNRTree;        ///< Pointer to neighborhood manager
+    NRTree* orderedNRTree;                   ///< Non-owning pointer to ordered NR-tree
     ProgressCallback progressCallback;        ///< Progress reporting callback
 
-    std::vector<ColocationInstance> genTableInstance(
+    std::map<Colocation, std::vector<ColocationInstance>> genTableInstance(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance> prevTableInstances,
+        const std::map<Colocation, std::vector<ColocationInstance>>& prevTableInstances,
 		const NRTree& orderedNRTree
-    );
-
-    std::vector<ColocationInstance> calculateWPI(
-        const std::vector<Colocation>& candidates,
-		const std::vector<ColocationInstance>& tableInstances
     );
 
    
     std::vector<Colocation> selectPrevColocations(
         const std::vector<Colocation>& candidates,
-        const std::vector<ColocationInstance>& tableInstances,
-        double minPrev
+        const std::map<Colocation, std::vector<ColocationInstance>>& tableInstances,
+        double minPrev,
+        const std::map<FeatureType, int>& featureCount, // Cần thêm để tính PR/RI
+        double delta
     );
+
+
+
 
 public:
     /**
@@ -69,6 +69,7 @@ public:
         double minPrevalence, 
         NRTree& orderedNRTree, 
         const std::vector<SpatialInstance>& instances,
+		const std::map<FeatureType, int>& featureCount,
         ProgressCallback progressCb = nullptr
     );
     
@@ -82,11 +83,28 @@ public:
      * @return std::vector<Colocation> Generated (k+1)-size candidate patterns
      */
     std::vector<Colocation> generateCandidates(
-        const std::vector<Colocation>& prevPrevalent
+        const std::vector<Colocation>& prevPrevalent,
+        const std::map<FeatureType, int>& featureCount
     );
 
     std::vector<Colocation> filterCandidates(
         const std::vector<Colocation>& candidates,
-		const std::vector<Colocation>& prevPrevalent
-	);
+		const std::vector<Colocation>& prevPrevalent,
+		const std::map<Colocation, std::vector<ColocationInstance>>& tableInstance,
+		double minPrev,
+		std::map<FeatureType, int> featureCount,
+		double delta
+    );
+
+
+    std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
+        const NRTree& tree,
+        const SpatialInstance* instance,
+        const FeatureType& featureType
+    );
+    std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
+        const NRTree& tree,
+        const ColocationInstance& instance,
+        const FeatureType& featureType
+    );
 };

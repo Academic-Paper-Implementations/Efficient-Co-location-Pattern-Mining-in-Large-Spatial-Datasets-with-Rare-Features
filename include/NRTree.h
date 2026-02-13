@@ -3,62 +3,70 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
-#include <unordered_map>
-#include "neighborhood_mgr.h" // Để dùng struct OrderedNeigh và FeatureType
+#include <map>
+#include <memory>
+#include "neighborhood_mgr.h" // To use struct OrderedNeigh and FeatureType
 #include "types.h"
+#include "utils.h"
 
-// --- [QUAN TRỌNG] THÊM DÒNG NÀY ---
+// --- [IMPORTANT] FORWARD DECLARATION ---
 class NeighborhoodMgr;
 // ---------------------------------
 
-// Loại node trong cây để dễ quản lý
+// Node types in the NR-Tree for structured organization
 enum NodeType {
-    ROOT_NODE,
-    FEATURE_NODE,
-    INSTANCE_NODE,
-    INSTANCE_VECTOR_NODE,  // Node để lưu vector các instances (dùng ở Level 4)
-    NEIGHBOR_NODE
+    ROOT_NODE,              // Root of the tree
+    FEATURE_NODE,           // Node representing a feature type
+    INSTANCE_NODE,          // Node representing a spatial instance
+    INSTANCE_VECTOR_NODE    // Leaf node containing a vector of instances
 };
 
-// Cấu trúc một nút trong cây NR-Tree
+// Structure of a node in the NR-Tree
 struct NRNode {
     NodeType type;
 
-    // Dữ liệu tùy thuộc vào loại node
-    FeatureType featureType;        // Dùng nếu là FEATURE_NODE
-    const SpatialInstance* data;    // Dùng nếu là INSTANCE_NODE hoặc NEIGHBOR_NODE
-    std::vector<const SpatialInstance*> instanceVector;  // Dùng nếu là INSTANCE_VECTOR_NODE
+    // Data depends on node type
+    FeatureType featureType;                            // Used if FEATURE_NODE
+    const SpatialInstance* instancePtr;                 // Used if INSTANCE_NODE
+    std::vector<const SpatialInstance*> instanceVector; // Used if INSTANCE_VECTOR_NODE
 
-    // Danh sách con
+    // List of children
     std::vector<NRNode*> children;
 
-    // Constructor helper
-    NRNode(NodeType t) : type(t), data(nullptr), featureType("") {}
+    // Constructor
+    explicit NRNode(NodeType nodeType) : type(nodeType), instancePtr(nullptr), featureType("") {}
 
+    // Destructor
     ~NRNode() {
         for (auto child : children) delete child;
         children.clear();
     }
+
+    // Rule of 5: Delete copy (manages raw pointers), default move
+    NRNode(const NRNode&) = delete;
+    NRNode& operator=(const NRNode&) = delete;
+    NRNode(NRNode&&) = default;
+    NRNode& operator=(NRNode&&) = default;
 };
 
 class NRTree {
 private:
-    NRNode* root;
+    std::unique_ptr<NRNode> root;
 
-    // Hàm đệ quy để in cây (cho mục đích debug)
+    // Recursive function to print tree (for debugging purposes)
     void printRecursive(NRNode* node, int level) const;
 
 public:
     NRTree();
     ~NRTree();
 
-    // Hàm quan trọng nhất: Xây dựng cây từ kết quả của NeighborhoodMgr
-    // Theo paper: features phải được sắp xếp theo số lượng instance (ascending)
-    void build(const NeighborhoodMgr& neighMgr, const std::unordered_map<FeatureType, int>& featureCounts);
+    // Most important function: Build tree from NeighborhoodMgr results
+    // According to paper: features must be sorted by instance count (ascending)
+    void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances);
 
-    // Hàm in cây ra màn hình để kiểm tra
+    // Print tree structure for debugging and verification
     void printTree() const;
 
-    // Getter root nếu cần xử lý bên ngoài
-    const NRNode* getRoot() const { return root; }
+    // Getter for root if external processing needed
+    const NRNode* getRoot() const { return root.get(); }
 };
