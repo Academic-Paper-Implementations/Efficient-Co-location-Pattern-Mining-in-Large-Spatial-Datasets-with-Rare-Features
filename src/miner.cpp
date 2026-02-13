@@ -19,6 +19,7 @@
 #include <omp.h> 
 #include <iomanip>
 #include <chrono>
+#include <unordered_set>
 
 std::vector<Colocation> JoinlessMiner::mineColocations(
     double minPrev,
@@ -35,13 +36,6 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     const std::vector<FeatureType> allFeatureTypes = getAllObjectTypes(instances);
     const std::vector<FeatureType> sortedTypes = featureSort(allFeatureTypes, instances);
     const double delta = calculateDelta(sortedTypes, featureCount);
-
-    // DEBUG: Print feature sort order (critical for algorithm correctness)
-    std::cout << "\n[DEBUG INIT] Feature Sort Order (Rare -> Frequent):\n";
-    for (const auto& featureType : sortedTypes) {
-        std::cout << "   " << featureType << ": " << featureCount.at(featureType) << " instances\n";
-    }
-    std::cout << "------------------------------------------------\n";
 
     std::vector<Colocation> prevColocations;
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
@@ -64,95 +58,27 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
     // --- MAIN LOOP ---
     while (!prevColocations.empty()) {
-        std::cout << "\n>>> ITERATION K = " << k << " <<<\n";
-
         std::map<Colocation, std::vector<ColocationInstance>> tableInstances;
 
         // 1. Generate Candidates
-        const auto t1_start = std::chrono::high_resolution_clock::now();
-        const std::vector<Colocation> candidates = generateCandidates(prevColocations, featureCount);
-        const auto t1_end = std::chrono::high_resolution_clock::now();
-
-        std::cout << "   [GEN] Generated: " << candidates.size() << " candidates. ";
-        printDuration("", t1_start, t1_end);
-
-        // --- DEBUG CHI TIẾT CANDIDATES ---
-        if (!candidates.empty()) {
-            std::cout << "      List of Candidates:\n";
-            for (const auto& cand : candidates) {
-                std::cout << "      - { ";
-                for (size_t i = 0; i < cand.size(); ++i) std::cout << cand[i] << (i < cand.size() - 1 ? ", " : "");
-                std::cout << " }\n";
-            }
-        }
-        // --------------------------------
-
+        std::vector<Colocation> candidates = generateCandidates(prevColocations, featureCount);
         if (candidates.empty()) break;
 
         // 2. Filter Candidates
-        const auto t2_start = std::chrono::high_resolution_clock::now();
         std::vector<Colocation> filteredCandidates = candidates;
         if (k != 2) {
             filteredCandidates = filterCandidates(candidates, prevColocations, prevTableInstances, minPrev, featureCount, delta);
         }
-        const auto t2_end = std::chrono::high_resolution_clock::now();
-
-        std::cout << "   [FLT] Filtered: " << candidates.size() << " -> " << filteredCandidates.size() << " candidates. ";
-        printDuration("", t2_start, t2_end);
 
         if (filteredCandidates.empty()) break;
 
         // 3. Generate Table Instances (Phần quan trọng nhất cần check)
-        const auto t3_start = std::chrono::high_resolution_clock::now();
         tableInstances = genTableInstance(filteredCandidates, prevTableInstances, orderedNRTree);
-        const auto t3_end = std::chrono::high_resolution_clock::now();
 
         size_t totalRows = 0;
         for (const auto& pair : tableInstances) totalRows += pair.second.size();
 
-        std::cout << "   [VER] Verified: Built instance table with " << totalRows << " rows. ";
-        printDuration("", t3_start, t3_end);
-
-        // --- DEBUG CHI TIẾT INSTANCE TABLE ---
-        std::cout << "      [DEBUG VERIFY] Instance Table Details:\n";
-        if (tableInstances.empty()) {
-            std::cout << "      !!! WARNING: No instances found for ANY candidate.\n";
-            std::cout << "      !!! Check: 1. NRTree correctness. 2. NeighborDistance (d) too small?\n";
-        }
-        else {
-            for (const auto& cand : filteredCandidates) {
-                // In ra candidate
-                std::cout << "      Pattern { ";
-                for (const auto& f : cand) std::cout << f << " ";
-                std::cout << "}: ";
-
-                // Kiểm tra xem candidate này có instance nào không
-                auto it = tableInstances.find(cand);
-                if (it != tableInstances.end()) {
-                    const auto& rows = it->second;
-                    std::cout << rows.size() << " instances found.\n";
-
-                    // In thử tối đa 3 dòng đầu tiên để check ID
-                    int printLimit = 3;
-                    for (size_t i = 0; i < std::min((size_t)rows.size(), (size_t)printLimit); ++i) {
-                        std::cout << "         Row " << i + 1 << ": [ ";
-                        for (const auto* inst : rows[i]) {
-                            std::cout << inst->id << "(" << inst->type << ") ";
-                        }
-                        std::cout << "]\n";
-                    }
-                    if (rows.size() > printLimit) std::cout << "         ... (more)\n";
-
-                }
-                else {
-                    std::cout << "0 instances (Empty).\n";
-                }
-            }
-        }
-        // -------------------------------------
-
         // 4. Select Prevalent
-        const auto t4_start = std::chrono::high_resolution_clock::now();
         prevColocations = selectPrevColocations(
             filteredCandidates,
             tableInstances,
@@ -160,20 +86,6 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
             featureCount,
             delta
         );
-        const auto t4_end = std::chrono::high_resolution_clock::now();
-
-        std::cout << "   [SEL] Selected: " << prevColocations.size() << " prevalent patterns. ";
-        printDuration("", t4_start, t4_end);
-
-        // Debug PI values (nếu cần thiết thì bỏ comment đoạn này)
-        /*
-        for (const auto& cand : filteredCandidates) {
-             double pi = calculatePI(cand, tableInstances, featureCount);
-             std::cout << "      PI({ ";
-             for(auto f : cand) std::cout << f << " ";
-             std::cout << "}) = " << pi << " (Threshold: " << minPrev << ")\n";
-        }
-        */
 
         if (!prevColocations.empty()) {
             allPrevalentColocations.insert(allPrevalentColocations.end(), prevColocations.begin(), prevColocations.end());
@@ -182,11 +94,6 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         prevTableInstances = std::move(tableInstances);
         k++;
     }
-
-    auto minerEnd = std::chrono::high_resolution_clock::now();
-    std::cout << "\n[MINER] Total Mining Time: "
-        << std::chrono::duration<double, std::milli>(minerEnd - minerStart).count() << " ms\n";
-
     return allPrevalentColocations;
 }
 
@@ -402,16 +309,6 @@ std::vector<const SpatialInstance*> JoinlessMiner::findExtendedSet(
     return intersection;
 }
 
-
-// Hàm helper để in pattern (VD: {A, B})
-void printDebugPattern(const Colocation& col) {
-    std::cout << "{";
-    for (size_t i = 0; i < col.size(); ++i) {
-        std::cout << col[i] << (i < col.size() - 1 ? ", " : "");
-    }
-    std::cout << "}";
-}
-
 std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableInstance(
     const std::vector<Colocation>& candidates,
     const std::map<Colocation, std::vector<ColocationInstance>>& prevTableInstances,
@@ -437,10 +334,6 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
 
         // --- [DEBUG 2] Kiểm tra Prefix (quan trọng nhất cho lỗi size 2) ---
         if (it == prevTableInstances.end()) {
-            std::cout << "[DEBUG] SKIP Candidate ";
-            printDebugPattern(candidate);
-            std::cout << ". Reason: Prefix ";
-            printDebugPattern(subPattern);
             std::cout << " NOT FOUND in prevTableInstances.\n";
 
             // Gợi ý lỗi cụ thể nếu đang chạy k=2
@@ -455,8 +348,6 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
 
         // --- [DEBUG 3] Prefix tồn tại nhưng không có instance nào ---
         if (prevInstancesList.empty()) {
-            std::cout << "[DEBUG] SKIP Candidate ";
-            printDebugPattern(candidate);
             std::cout << ". Reason: Prefix found but has 0 instances.\n";
             continue;
         }
@@ -481,14 +372,9 @@ std::map<Colocation, std::vector<ColocationInstance>> JoinlessMiner::genTableIns
             result[candidate] = std::move(newTableRows);
         }
         else {
-            // --- [DEBUG 4] Xử lý xong nhưng không tạo được instance nào (do không thỏa mãn khoảng cách) ---
-            // Đây thường không phải lỗi code, mà do dữ liệu không có co-location ở vị trí này
-            std::cout << "[INFO] Candidate ";
-            printDebugPattern(candidate);
             std::cout << " processed but NO instances generated (No neighbors satisfy distance).\n";
         }
     }
-
     return result;
 }
 
