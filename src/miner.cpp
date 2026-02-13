@@ -33,15 +33,15 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
     // --- INIT ---
     int k = 2;
-    std::vector<FeatureType> types = getAllObjectTypes(instances);
-    std::vector<FeatureType> sortedTypes = featureSort(types, instances);
-    double delta = calculateDelta(sortedTypes, featureCount);
+    const std::vector<FeatureType> allFeatureTypes = getAllObjectTypes(instances);
+    const std::vector<FeatureType> sortedTypes = featureSort(allFeatureTypes, instances);
+    const double delta = calculateDelta(sortedTypes, featureCount);
 
     std::vector<Colocation> prevColocations;
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
 
-    // Khởi tạo T1 (Table Instance k=1)
-    // Map: {Key: [FeatureType], Value: List of rows}
+    // Initialize T1 (Table Instance for k=1)
+    // Map structure: {Key: [FeatureType], Value: List of instance rows}
     for (const auto& instance : instances) {
         Colocation key = { instance.type };
         ColocationInstance row = { &instance };
@@ -50,8 +50,11 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
 
     std::vector<Colocation> allPrevalentColocations;
 
-    // Khởi tạo P1 (Prevalent k=1)
-    for (auto t : sortedTypes) prevColocations.push_back({ t });
+    // Initialize P1 (Prevalent patterns for k=1)
+    prevColocations.reserve(sortedTypes.size());
+    for (const auto& featureType : sortedTypes) {
+        prevColocations.push_back({ featureType });
+    }
 
     // --- MAIN LOOP ---
     while (!prevColocations.empty()) {
@@ -107,16 +110,16 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
         return candidates;
     }
 
-    size_t patternSize = prevPrevalent[0].size();
+    const size_t patternSize = prevPrevalent[0].size();
 
     // Join phase: generate k-size candidates from (k-1)-size prevalent patterns
-    for (size_t i = 0; i < prevPrevalent.size(); i++) {
-        for (size_t j = i + 1; j < prevPrevalent.size(); j++) {
+    for (size_t firstPatternIdx = 0; firstPatternIdx < prevPrevalent.size(); firstPatternIdx++) {
+        for (size_t secondPatternIdx = firstPatternIdx + 1; secondPatternIdx < prevPrevalent.size(); secondPatternIdx++) {
             // Take prefix of k-1 first element
-            Colocation prefix1(prevPrevalent[i].begin(),
-                prevPrevalent[i].end() - 1);
-            Colocation prefix2(prevPrevalent[j].begin(),
-                prevPrevalent[j].end() - 1);
+            const Colocation prefix1(prevPrevalent[firstPatternIdx].begin(),
+                prevPrevalent[firstPatternIdx].end() - 1);
+            const Colocation prefix2(prevPrevalent[secondPatternIdx].begin(),
+                prevPrevalent[secondPatternIdx].end() - 1);
 
             // Just join when the prefix is equal
             if (prefix1 != prefix2) {
@@ -125,12 +128,12 @@ std::vector<Colocation> JoinlessMiner::generateCandidates(
             
             // Generate new candidate
 			Colocation candidate;
-            if (featureCount.at(prevPrevalent[i].back()) <= featureCount.at(prevPrevalent[j].back())) {
-                candidate = prevPrevalent[i];
-                candidate.push_back(prevPrevalent[j].back());
+            if (featureCount.at(prevPrevalent[firstPatternIdx].back()) <= featureCount.at(prevPrevalent[secondPatternIdx].back())) {
+                candidate = prevPrevalent[firstPatternIdx];
+                candidate.push_back(prevPrevalent[secondPatternIdx].back());
             }else {
-				candidate = prevPrevalent[j];
-				candidate.push_back(prevPrevalent[i].back());
+				candidate = prevPrevalent[secondPatternIdx];
+				candidate.push_back(prevPrevalent[firstPatternIdx].back());
             }
             
             candidates.push_back(candidate);
@@ -164,15 +167,15 @@ std::vector<Colocation> JoinlessMiner::filterCandidates(
     for (const auto& candidate : candidates) {
         bool isValid = true;
         // Generate all (k-1)-size subsets
-        for (size_t i = 0; i < candidate.size(); i++) {
+        for (size_t featureIndexToRemove = 0; featureIndexToRemove < candidate.size(); featureIndexToRemove++) {
             Colocation subset;
             for (size_t j = 0; j < candidate.size(); j++) {
-                if (j != i) subset.push_back(candidate[j]);
+                if (j != featureIndexToRemove) subset.push_back(candidate[j]);
             }
 
             // --- CASE 1: Subset contains f_min (Lemma 2) ---
             // If we removed an element at index i != 0, the subset still keeps candidate[0] (f_min).
-            if (i != 0) {
+            if (featureIndexToRemove != 0) {
                 // Lemma 2: If a subset containing f_min is NOT prevalent, C is not prevalent 
                 if (!std::binary_search(sortedPrev.begin(), sortedPrev.end(), subset)) {
                     isValid = false;
@@ -233,7 +236,7 @@ std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
         if (featureNode->type == FEATURE_NODE && featureNode->featureType == instance->type) {
             // Find the instance node for this specific instance (Level 2)
             for (const auto* instanceNode : featureNode->children) {
-                if (instanceNode->type == INSTANCE_NODE && instanceNode->data->id == instance->id) {
+                if (instanceNode->type == INSTANCE_NODE && instanceNode->instancePtr->id == instance->id) {
                     // Find the neighbor feature node for the target feature type (Level 3)
                     for (const auto* neighborFeatureNode : instanceNode->children) {
                         if (neighborFeatureNode->type == FEATURE_NODE && 
@@ -388,27 +391,27 @@ std::vector<Colocation> JoinlessMiner::selectPrevColocations(
     for (const auto& candidate : candidates) {
         // Init WPI with a safe max value
         double wpi = 1.0;
-        bool first = true;
+        bool isFirstFeature = true;
 
         for (const FeatureType& feature : candidate) {
             double pr = calculatePR(feature, candidate, tableInstances, featureCount);
             double ri = calculateRareIntensity(feature, candidate, featureCount, delta);
 
             // Safety check for RI
-            double w = 0.0;
+            double weight = 0.0;
             if (ri > Constants::EPSILON_SMALL) { // Epsilon check
-                w = 1.0 / ri;
+                weight = 1.0 / ri;
             }
             else {
                 // If RI is 0 (should imply feature not in pattern or error), weight is huge or handled
-                w = 0.0;
+                weight = 0.0;
             }
 
-            double wpr = pr * w;
+            double wpr = pr * weight;
 
-            if (first) {
+            if (isFirstFeature) {
                 wpi = wpr;
-                first = false;
+                isFirstFeature = false;
             }
             else {
                 if (wpr < wpi) {
