@@ -1,14 +1,21 @@
 ﻿#include "NRTree.h"
 #include "utils.h"
 
-NRTree::NRTree() : root(std::make_unique<NRNode>(ROOT_NODE)) {
+NRTree::NRTree() {
+    root = new NRNode(ROOT_NODE);
 }
 
-NRTree::~NRTree() = default;
+NRTree::~NRTree() {
+    if (root) {
+        delete root; // Node destructor will automatically delete children recursively
+        root = nullptr;
+    }
+}
 
 void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances) {
     // 0. Reset tree if old data exists
-    root = std::make_unique<NRNode>(ROOT_NODE);
+    if (root) delete root;
+    root = new NRNode(ROOT_NODE);
 
     // Get raw map data: unordered_map<FeatureType, vector<OrderedNeigh>>
     const auto& rawMap = neighMgr.getOrderedNeighbors();
@@ -32,13 +39,14 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
             return a < b; // Lexicographic tie-breaker
         });
 
-    for (const auto& featureType : sortedFeatures) {
-        // Create feature node (e.g., Node A) - exception safe with unique_ptr
-        auto featureNode = std::make_unique<NRNode>(FEATURE_NODE);
-        featureNode->featureType = featureType;
+    for (const auto& fType : sortedFeatures) {
+        // Create feature node (e.g., Node A)
+        NRNode* fNode = new NRNode(FEATURE_NODE);
+        fNode->featureType = fType;
+        root->children.push_back(fNode);
 
         // Get list of center instances for this feature
-        const auto& starList = rawMap.at(featureType);
+        const auto& starList = rawMap.at(fType);
 
         // 2. LEVEL 2: INSTANCE NODES (Center)
         // Sort instance centers by ID for consistent ordering
@@ -79,9 +87,9 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
 
             // Create FEATURE_NODE for each neighbor feature type
             for (const auto& neighborFeatureType : neighborFeatureTypes) {
-                // Exception safe allocation
-                auto neighborFeatureNode = std::make_unique<NRNode>(FEATURE_NODE);
+                NRNode* neighborFeatureNode = new NRNode(FEATURE_NODE);
                 neighborFeatureNode->featureType = neighborFeatureType;
+                centerNode->children.push_back(neighborFeatureNode);
 
                 // 4. LEVEL 4: INSTANCE_VECTOR_NODE (single node containing vector of neighbor instances)
                 // Get list of instances for this feature type and sort by ID (alphabetical)
@@ -121,7 +129,7 @@ void NRTree::build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, 
 
 void NRTree::printTree() const {
     std::cout << "\n=== ORDERED NR-TREE STRUCTURE ===\n";
-    printRecursive(root.get(), 0);
+    printRecursive(root, 0);
     std::cout << "=================================\n";
 }
 
@@ -137,8 +145,8 @@ void NRTree::printRecursive(NRNode* node, int level) const {
         std::cout << indent << "+ Feature: " << node->featureType << "\n";
     }
     else if (node->type == INSTANCE_NODE) {
-        std::cout << indent << "- Instance: " << node->instancePtr->id
-            << " [" << node->instancePtr->type << "]\n";
+        std::cout << indent << "- Instance: " << node->data->id
+            << " [" << node->data->type << "]\n";
     }
     else if (node->type == INSTANCE_VECTOR_NODE) {
         std::cout << indent << "- Instance Vector (" << node->instanceVector.size() << " instances): [";
@@ -147,7 +155,7 @@ void NRTree::printRecursive(NRNode* node, int level) const {
             if (!first) std::cout << ", ";
             std::cout << inst->id << "[" << inst->type << "]";
             first = false;
-    }
+        }
         std::cout << "]\n";
         return; // INSTANCE_VECTOR_NODE is a leaf, no children
     }
