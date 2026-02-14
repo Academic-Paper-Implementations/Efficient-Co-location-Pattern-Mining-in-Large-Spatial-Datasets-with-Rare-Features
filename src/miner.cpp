@@ -236,7 +236,7 @@ std::vector<const SpatialInstance*> JoinlessMiner::findNeighbors(
         if (featureNode->type == FEATURE_NODE && featureNode->featureType == instance->type) {
             // Find the instance node for this specific instance (Level 2)
             for (const auto* instanceNode : featureNode->children) {
-                if (instanceNode->type == INSTANCE_NODE && instanceNode->instancePtr->id == instance->id) {
+                if (instanceNode->type == INSTANCE_NODE && instanceNode->data->id == instance->id) {
                     // Find the neighbor feature node for the target feature type (Level 3)
                     for (const auto* neighborFeatureNode : instanceNode->children) {
                         if (neighborFeatureNode->type == FEATURE_NODE && 
