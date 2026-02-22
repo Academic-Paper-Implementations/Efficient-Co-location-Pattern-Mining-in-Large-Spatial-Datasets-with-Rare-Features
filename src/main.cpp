@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Step 2: Load Data
     // ========================================================================
-    auto instances = DataLoader::load_csv(config.datasetPath);
+    auto instances = DataLoader::load_csv(config.datasetPath, config.percentageData);
 
     // ========================================================================
     // Step 3: Build Spatial Index
@@ -92,6 +92,7 @@ int main(int argc, char* argv[]) {
     outFile << "Total Instances:   " << instances.size() << "\n";
     outFile << "Neighbor Distance: " << config.neighborDistance << "\n";
     outFile << "Min Prevalence:    " << config.minPrev << "\n";
+	outFile << "Percentage Data:    " << (config.percentageData * 100) << "%\n";
     outFile << "----------------------------------------\n";
 
     // (B) Execution Time
