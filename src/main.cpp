@@ -34,14 +34,7 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Step 2: Load Data
     // ========================================================================
-    printSectionHeader("STEP 2: LOAD DATA");
-    const auto loadStartTime = std::chrono::high_resolution_clock::now();
-    const auto instances = DataLoader::load_csv(config.datasetPath);
-    const auto loadEndTime = std::chrono::high_resolution_clock::now();
-    const double load_time = std::chrono::duration<double, std::milli>(loadEndTime - loadStartTime).count();
-
-    std::cout << "[DATA] Loaded " << instances.size() << " instances.\n";
-    std::cout << "[TIME] Load time: " << std::fixed << std::setprecision(2) << load_time << " ms\n";
+    auto instances = DataLoader::load_csv(config.datasetPath, config.percentageData);
 
     // ========================================================================
     // Step 3: Build Spatial Index
@@ -101,6 +94,43 @@ int main(int argc, char* argv[]) {
     std::cout << std::left << std::setw(35) << "Total Prevalent Patterns:" << colocations.size() << "\n";
     std::cout << std::left << std::setw(35) << "Total Execution Time:" << std::fixed << std::setprecision(4) << totalTimeSec << " s\n";
     std::cout << std::left << std::setw(35) << "Peak Memory Usage:" << std::fixed << std::setprecision(2) << maxMemory << " MB\n";
+    auto programEnd = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(programEnd - programStart).count();
+
+    // --- REPORT GENERATION (FILE ONLY) ---
+    // 1. Get Memory Info (Peak)
+    HANDLE handle = GetCurrentProcess();
+    PROCESS_MEMORY_COUNTERS memCounter;
+    SIZE_T peakMemMB = 0;
+
+    if (GetProcessMemoryInfo(handle, &memCounter, sizeof(memCounter))) {
+        peakMemMB = memCounter.PeakWorkingSetSize / 1024 / 1024; // Convert to MB
+    }
+
+    // 2. Write to File
+    std::ofstream outFile("../results.txt");
+    if (!outFile.is_open()) {
+        std::cerr << "Cannot open results.txt for writing.\n";
+        return 1;
+    }
+    // (A) Thông tin Dataset & Config
+    outFile << "=== FINAL REPORT ===\n";
+    outFile << "Dataset Path:      " << config.datasetPath << "\n";
+    outFile << "Total Instances:   " << instances.size() << "\n";
+    outFile << "Neighbor Distance: " << config.neighborDistance << "\n";
+    outFile << "Min Prevalence:    " << config.minPrev << "\n";
+	outFile << "Percentage Data:    " << (config.percentageData * 100) << "%\n";
+    outFile << "----------------------------------------\n";
+
+    // (B) Execution Time
+    outFile << "Execution Time: " << std::fixed << std::setprecision(3) << totalTime << " s\n";
+
+    // (C) Peak Memory Usage
+    outFile << "Peak Memory Usage: " << peakMemMB << " MB\n";
+
+    // (D) Number of Patterns Found
+    outFile << "Patterns Found: " << colocations.size() << "\n";
+    outFile << "----------------------------------------\n";
 
     // (E) List of Patterns
     if (!colocations.empty()) {
