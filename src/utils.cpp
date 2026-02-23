@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "constants.h"
 #include <set>
+#include <numeric>
 #include <chrono>
 #include <windows.h>
 #include <psapi.h>
@@ -90,57 +91,41 @@ std::vector<FeatureType> featureSort(const std::vector<FeatureType>& featureSet,
 // Formula: delta = (2 / (m*(m-1))) * Sum_{i<j} (num(f_j) / num(f_i))
 // This represents the average ratio of instance counts between all pairs of features,
 // where features are sorted by instance count (f_i <= f_j).
-double calculateDelta(const std::vector<FeatureType>& sortedFeatures, const std::map<FeatureType, int>& featureCounts) {
-    if (sortedFeatures.size() < 2) {
-        return 0.0;
-    }
+double calculateDelta(
+    const std::vector<FeatureType>& sortedFeatures,
+    const std::map<FeatureType, int>& featureCounts) {
 
-    // 1. Extract counts in the order of sortedFeatures (Step 2 order)
-    std::vector<double> counts;
-    counts.reserve(sortedFeatures.size());
+    if (sortedFeatures.size() < 2) return 0.0;
+
+    std::vector<double> logCounts;
+    logCounts.reserve(sortedFeatures.size());
+
+    // Lấy count theo đúng sortedFeatures
     for (const auto& feat : sortedFeatures) {
-        if (featureCounts.find(feat) != featureCounts.end()) {
-            counts.push_back(static_cast<double>(featureCounts.at(feat)));
-        } else {
-            // Should not happen if sortedFeatures comes from keys of featureCounts,
-            // but safe to handle.
-            counts.push_back(0.0);
+        auto it = featureCounts.find(feat);
+        if (it != featureCounts.end() && it->second > 0) {
+            logCounts.push_back(std::log(static_cast<double>(it->second)));
         }
     }
 
-    // 2. NO sorting of 'counts' here. 
-    // We rely on 'sortedFeatures' being already sorted by quantity (Step 2).
-    // Paper: delta = 2/(m(m-1)) * Sum_{i<j} (|fj| / |fi|)
-    // The indices i, j correspond to the sorted feature list order.
+    size_t m = logCounts.size();
+    if (m < 2) return 0.0;
 
-    const double numFeatures = static_cast<double>(counts.size());
-    double sumRatios = 0.0;
+    // Tính mean
+    double sumLog = std::accumulate(logCounts.begin(), logCounts.end(), 0.0);
+    double meanLog = sumLog / m;
 
-    // 3. Calculate sum of ratios for all pairs i < j
-    for (size_t i = 0; i < counts.size(); ++i) {
-        for (size_t j = i + 1; j < counts.size(); ++j) {
-            // Formula uses |fj| / |fi| where i < j
-            // Since features are sorted by count ascending, |fi| <= |fj| usually holds,
-            // making the ratio >= 1 (or close to it/handling stability).
-            const double numerator = counts[j];
-            double denominator = counts[i];
-            
-            // Handle division by zero
-            if (denominator == 0.0) {
-                denominator = Constants::EPSILON_SMALL;
-            }
-            
-            const double ratio = numerator / denominator;
-            sumRatios += ratio;
-        }
+    // Tính variance
+    double sumSqDiff = 0.0;
+    for (double val : logCounts) {
+        sumSqDiff += (val - meanLog) * (val - meanLog);
     }
 
-    // 4. Calculate final Delta
-    // Factor = 2 / (numFeatures * (numFeatures - 1))
-    const double factor = 2.0 / (numFeatures * (numFeatures - 1.0));
-    
-    return factor * sumRatios;
+    double variance = sumSqDiff / (m - 1); // sample stddev
+
+    return std::sqrt(variance);
 }
+
 
 // Calculate Participation Ratio (PR)
 // PR(fi, C) = (number of distinct instances of fi in T(C)) / (number of instances of fi)
@@ -196,53 +181,51 @@ double calculatePR(
 // Definition 3, Formula (5): RI(fi, C) = exp( - (v(fi, C) - 1)^2 / (2 * delta^2) )
 // where v(fi, C) = num(fi) / num(f_min) (Definition 2)
 double calculateRareIntensity(
-    const FeatureType& rareType, 
+    const FeatureType& rareType,
     const Colocation& pattern,
     const std::map<FeatureType, int>& featureCounts,
-    const double delta) 
+    const double delta)
 {
-    // Safety check for delta to avoid division by zero
-    if (delta <= Constants::EPSILON_DELTA) return 0.0;
+    if (pattern.empty()) return 0.0;
 
-    // Definition check: RI(fi, C) is only defined if fi is in C
+    // rareType phải thuộc pattern
     if (std::find(pattern.begin(), pattern.end(), rareType) == pattern.end()) {
         return 0.0;
     }
 
-    // 1. Find num(f_min) in the pattern
+    // 1. Tìm minCount = N(f_min)
     int minCount = -1;
-    for (const auto& feature : pattern) {
-        const auto featureIt = featureCounts.find(feature);
-        if (featureIt != featureCounts.end()) {
-            const int count = featureIt->second;
+    for (const auto& f : pattern) {
+        auto it = featureCounts.find(f);
+        if (it != featureCounts.end()) {
+            int count = it->second;
             if (minCount == -1 || count < minCount) {
                 minCount = count;
             }
-        } else {
-            // If a feature in the pattern has 0 instances, minCount is 0 logic
-            minCount = 0; 
-            break; 
         }
     }
 
-    if (minCount <= 0) {
-        return 0.0; // Avoid division by zero in v calculation
-    }
+    if (minCount <= 0) return 0.0;
 
-    // 2. Get num(fi) for the rareType
-    const int rareCount = (featureCounts.find(rareType) != featureCounts.end()) 
-        ? featureCounts.at(rareType) : 0;
+    // 2. Lấy count của rareType
+    auto itRare = featureCounts.find(rareType);
+    if (itRare == featureCounts.end() || itRare->second <= 0) return 0.0;
 
-    // 3. Calculate v(fi, C) = num(fi) / num(f_min)
-    const double v_val = static_cast<double>(rareCount) / static_cast<double>(minCount);
+    int count = itRare->second;
 
-    // 4. Calculate RI
-    // exponent term = - (v - 1)^2 / (2 * delta^2)
-    const double numerator = std::pow(v_val - 1.0, 2);
-    const double denominator = 2.0 * delta * delta;
-    
-    return std::exp(-numerator / denominator);
+    // 3. Tính theo log-space (GIỐNG calcRareIntensity)
+    double sigmaSq2 = 2.0 * delta * delta;
+    if (sigmaSq2 <= 0) sigmaSq2 = 1e-9;
+
+    double logMin = std::log(static_cast<double>(minCount));
+    double logCount = std::log(static_cast<double>(count));
+    double deltaLog = logCount - logMin;
+
+    double ri = std::exp(-(deltaLog * deltaLog) / sigmaSq2);
+
+    return ri;
 }
+
 
 // Calculate Participation Index (PI)
 // PI(C) = min_{i=1 to k} { PR(fi, C) }

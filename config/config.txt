@@ -1,10 +1,10 @@
 # I/O Paths
-dataset_path=data/LasVegas_x_y_alphabet_version_03_2.csv
+dataset_path=data/Toronto_x_y_alphabet_version_new_2.csv
 output_path=results/colocation_rules.txt
 
 # Algorithm Thresholds
-neighbor_distance=300
-min_prevalence=0.5
+neighbor_distance=160
+min_prevalence=0.1
 min_cond_prob=0.5
 
 # Debug
