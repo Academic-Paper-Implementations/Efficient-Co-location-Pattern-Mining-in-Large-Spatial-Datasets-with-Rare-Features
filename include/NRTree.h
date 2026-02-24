@@ -52,15 +52,9 @@ public:
     NRTree();
     ~NRTree();
 
-    // Rule of 5: Delete copy (unique_ptr member), default move
-    NRTree(const NRTree&) = delete;
-    NRTree& operator=(const NRTree&) = delete;
-    NRTree(NRTree&&) = default;
-    NRTree& operator=(NRTree&&) = default;
-
-    // Build tree from NeighborhoodMgr results
-    // Features must be sorted by instance count (ascending) according to the paper
-    void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts);
+    // Most important function: Build tree from NeighborhoodMgr results
+    // According to paper: features must be sorted by instance count (ascending)
+    void build(const NeighborhoodMgr& neighMgr, const std::map<FeatureType, int>& featureCounts, const std::vector<SpatialInstance>& instances);
 
     // Function to print tree to screen for verification
     void printTree() const;

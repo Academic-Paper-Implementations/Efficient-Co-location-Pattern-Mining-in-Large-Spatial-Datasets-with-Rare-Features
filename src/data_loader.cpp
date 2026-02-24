@@ -24,20 +24,20 @@ std::vector<SpatialInstance> DataLoader::load_csv(const std::string& filepath, d
     CSVReader reader(filepath);
     auto colNames = reader.get_col_names();
     std::string xCol = "LocX";
-    std::string yCol = "LocY";
+	std::string yCol = "LocY";
+
     auto hasColumn = [&](const std::string& name) {
         return std::find(colNames.begin(), colNames.end(), name) != colNames.end();
-    };
+        };
 
     if (hasColumn("X")) xCol = "X";
     if (hasColumn("Y")) yCol = "Y";
-
-    std::vector<SpatialInstance> instances;
+    std::vector<SpatialInstance> allInstances;
 
     for (auto& row : reader) {
         SpatialInstance instance;
         instance.type = row["Feature"].get<FeatureType>();
-        instance.id = instanceID(instance.type + std::to_string(row["Instance"].get<int>()));
+        instance.id = instance.type + std::to_string(row["Instance"].get<int>());
         instance.x = row[xCol].get<double>();
         instance.y = row[yCol].get<double>();
         

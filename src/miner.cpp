@@ -37,13 +37,6 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
     const std::vector<FeatureType> sortedTypes = featureSort(allFeatureTypes, instances);
     const double delta = calculateDelta(sortedTypes, featureCount);
 
-    // DEBUG: Print feature sort order (critical for algorithm correctness)
-    std::cout << "\n[DEBUG INIT] Feature Sort Order (Rare -> Frequent):\n";
-    for (const auto& featureType : sortedTypes) {
-        std::cout << "   " << featureType << ": " << featureCount.at(featureType) << " instances\n";
-    }
-    std::cout << "------------------------------------------------\n";
-
     std::vector<Colocation> prevColocations;
     std::map<Colocation, std::vector<ColocationInstance>> prevTableInstances;
 
@@ -68,49 +61,24 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
         std::map<Colocation, std::vector<ColocationInstance>> tableInstances;
 
         // 1. Generate Candidates
-        const auto t1_start = std::chrono::high_resolution_clock::now();
-        const std::vector<Colocation> candidates = generateCandidates(prevColocations, featureCount);
-        const auto t1_end = std::chrono::high_resolution_clock::now();
-
-        std::cout << "   [GEN] Generated: " << candidates.size() << " candidates. ";
-        printDuration("", t1_start, t1_end);
-
-        // --- DEBUG CHI TIẾT CANDIDATES ---
-        if (!candidates.empty()) {
-            std::cout << "      List of Candidates:\n";
-            for (const auto& cand : candidates) {
-                std::cout << "      - { ";
-                for (size_t i = 0; i < cand.size(); ++i) std::cout << cand[i] << (i < cand.size() - 1 ? ", " : "");
-                std::cout << " }\n";
-            }
-        }
-        // --------------------------------
-
+        std::vector<Colocation> candidates = generateCandidates(prevColocations, featureCount);
         if (candidates.empty()) break;
 
         // 2. Filter Candidates
-        const auto t2_start = std::chrono::high_resolution_clock::now();
         std::vector<Colocation> filteredCandidates = candidates;
         if (k != 2) {
             filteredCandidates = filterCandidates(candidates, prevColocations, prevTableInstances, minPrev, featureCount, delta);
         }
-        const auto t2_end = std::chrono::high_resolution_clock::now();
-
-        std::cout << "   [FLT] Filtered: " << candidates.size() << " -> " << filteredCandidates.size() << " candidates. ";
-        printDuration("", t2_start, t2_end);
 
         if (filteredCandidates.empty()) break;
 
         // 3. Generate Table Instances (Phần quan trọng nhất cần check)
-        const auto t3_start = std::chrono::high_resolution_clock::now();
         tableInstances = genTableInstance(filteredCandidates, prevTableInstances, orderedNRTree);
-        const auto t3_end = std::chrono::high_resolution_clock::now();
 
         size_t totalRows = 0;
         for (const auto& pair : tableInstances) totalRows += pair.second.size();
 
         // 4. Select Prevalent
-        const auto t4_start = std::chrono::high_resolution_clock::now();
         prevColocations = selectPrevColocations(
             filteredCandidates,
             tableInstances,
@@ -118,20 +86,6 @@ std::vector<Colocation> JoinlessMiner::mineColocations(
             featureCount,
             delta
         );
-        const auto t4_end = std::chrono::high_resolution_clock::now();
-
-        std::cout << "   [SEL] Selected: " << prevColocations.size() << " prevalent patterns. ";
-        printDuration("", t4_start, t4_end);
-
-        // Debug PI values (nếu cần thiết thì bỏ comment đoạn này)
-        /*
-        for (const auto& cand : filteredCandidates) {
-             double pi = calculatePI(cand, tableInstances, featureCount);
-             std::cout << "      PI({ ";
-             for(auto f : cand) std::cout << f << " ";
-             std::cout << "}) = " << pi << " (Threshold: " << minPrev << ")\n";
-        }
-        */
 
         if (!prevColocations.empty()) {
             allPrevalentColocations.insert(allPrevalentColocations.end(), prevColocations.begin(), prevColocations.end());

@@ -39,37 +39,19 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Step 3: Build Spatial Index
     // ========================================================================
-    printSectionHeader("STEP 3: SPATIAL INDEXING");
-    const auto indexStartTime = std::chrono::high_resolution_clock::now();
     SpatialIndex spatial_idx(config.neighborDistance);
-    const auto neighborPairs = spatial_idx.findNeighborPair(instances);
-    const auto indexEndTime = std::chrono::high_resolution_clock::now();
-    const double idx_time = std::chrono::duration<double, std::milli>(indexEndTime - indexStartTime).count();
-
-    std::cout << "[DATA] Found " << neighborPairs.size() << " neighbor pairs.\n";
-    std::cout << "[TIME] Indexing time: " << std::fixed << std::setprecision(2) << idx_time << " ms\n";
+    auto neighborPairs = spatial_idx.findNeighborPair(instances);
 
     // ========================================================================
     // Step 4: Materialize Neighborhoods
     // ========================================================================
-    printSectionHeader("STEP 4: NEIGHBORHOOD MATERIALIZATION");
-    const auto materializationStartTime = std::chrono::high_resolution_clock::now();
-    const std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
+    std::map<FeatureType, int> featureCount = countInstancesByFeature(instances);
 
     NeighborhoodMgr neighbor_mgr;
     neighbor_mgr.buildFromPairs(neighborPairs, featureCount);
 
     NRTree orderedNRTree;
     orderedNRTree.build(neighbor_mgr, featureCount,instances);
-
-    const auto materializationEndTime = std::chrono::high_resolution_clock::now();
-    const double mat_time = std::chrono::duration<double, std::milli>(materializationEndTime - materializationStartTime).count();
-
-    std::cout << "[INFO] Feature Counts:\n";
-    for (const auto& pair : featureCount) {
-        std::cout << "   - " << std::left << std::setw(5) << pair.first << ": " << pair.second << " instances\n";
-    }
-    std::cout << "[TIME] Materialization time: " << std::fixed << std::setprecision(2) << mat_time << " ms\n";
 
     // ========================================================================
     // Step 5: Mine Colocation Patterns
@@ -85,15 +67,6 @@ int main(int argc, char* argv[]) {
     // ========================================================================
     // Final Report
     // ========================================================================
-    printSectionHeader("FINAL SUMMARY");
-
-    const auto programEnd = std::chrono::high_resolution_clock::now();
-    const double totalTimeSec = std::chrono::duration<double>(programEnd - programStart).count();
-    const double maxMemory = getMemoryUsageMB();
-
-    std::cout << std::left << std::setw(35) << "Total Prevalent Patterns:" << colocations.size() << "\n";
-    std::cout << std::left << std::setw(35) << "Total Execution Time:" << std::fixed << std::setprecision(4) << totalTimeSec << " s\n";
-    std::cout << std::left << std::setw(35) << "Peak Memory Usage:" << std::fixed << std::setprecision(2) << maxMemory << " MB\n";
     auto programEnd = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(programEnd - programStart).count();
 
